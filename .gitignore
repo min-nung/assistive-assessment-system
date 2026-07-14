@@ -1,0 +1,15 @@
+# Editor and OS files
+.vscode/
+.claude/
+.DS_Store
+Thumbs.db
+
+# Local runtime and package artifacts
+node_modules/
+npm-debug.log*
+
+# Local data exports and original source documents
+*.xlsx
+*.xls
+*.csv
+*補助金額對照表*.md

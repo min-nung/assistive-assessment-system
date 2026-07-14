@@ -1,0 +1,177 @@
+﻿<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2c3e50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>輔具評估系統</title>
+<link rel="stylesheet" href="./assets/css/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="bar">
+      <button class="back-btn" id="backBtn" style="display:none;">‹ 返回</button>
+      <h1 id="headerTitle">輔具評估系統</h1>
+      <button class="action-btn data-management-btn" id="dataManagementBtn" style="display:none;" aria-label="資料管理">⋯</button>
+    </div>
+    <div class="subtitle" id="subtitle">選擇評估項目</div>
+  </header>
+
+  <!-- Main Menu View -->
+  <section id="mainMenuView" style="display:none;">
+    <div id="menuBasicInfo"></div>
+    <div class="menu-grid">
+      <button class="menu-card stair-card" id="menuStairBtn">
+        <div class="menu-icon">🏠</div>
+        <div class="menu-label">爬梯機</div>
+      </button>
+      <button class="menu-card ha-card" id="menuHomeAccessBtn">
+        <div class="menu-icon">🛠</div>
+        <div class="menu-label">居家無障礙</div>
+      </button>
+      <button class="menu-card transfer-card" id="menuTransferBtn">
+        <div class="menu-icon">🔄</div>
+        <div class="menu-label">移位輔具</div>
+      </button>
+      <button class="menu-card cushion-card" id="menuCushionBtn">
+        <div class="menu-icon">💺</div>
+        <div class="menu-label">輪椅座墊</div>
+      </button>
+      <button class="menu-card airbed-card" id="menuAirbedBtn">
+        <div class="menu-icon">🛏</div>
+        <div class="menu-label">氣墊床／電動床</div>
+      </button>
+      <button class="menu-card wc-card" id="menuWheelchairBtn">
+        <div class="menu-icon">♿</div>
+        <div class="menu-label">輪椅</div>
+      </button>
+      <button class="menu-card walker-card" id="menuWalkerBtn">
+        <div class="menu-icon">🚶</div>
+        <div class="menu-label">帶輪型助步車</div>
+      </button>
+      <button class="menu-card shower-card" id="menuShowerBtn">
+        <div class="menu-icon">🚿</div>
+        <div class="menu-label">沐浴椅／便盆椅</div>
+      </button>
+    </div>
+    <div id="menuSubsidyCalc"></div>
+  </section>
+
+  <!-- Case List View -->
+  <section id="listView" style="display:none;">
+    <div class="new-case">
+      <label for="newCaseName">新增個案</label>
+      <div class="row">
+        <input id="newCaseName" type="text" placeholder="輸入個案名稱（例：王先生 3F 公寓）" maxlength="40" autocomplete="off">
+        <button class="primary" id="createCaseBtn">建立</button>
+      </div>
+    </div>
+
+    <div class="list-header">
+      <h2>個案清單</h2>
+      <span class="count-badge" id="caseCount"></span>
+    </div>
+    <div id="caseList"></div>
+  </section>
+
+  <!-- Editor View -->
+  <section id="editorView" style="display:none;">
+    <div id="blocksContainer"></div>
+
+    <div class="flow-actions" id="flowActions">
+      <button class="flow-btn stair" id="addStairBtn">＋ 新增樓梯段</button>
+      <button class="flow-btn platform" id="addPlatformBtn">＋ 新增迴轉平台</button>
+    </div>
+
+    <button class="calc-btn" id="calcBtn">計算結果</button>
+
+    <div id="inlineResults" class="inline-results" style="display:none">
+      <table class="results">
+        <thead>
+          <tr>
+            <th style="width:40%">項目</th>
+            <th>寬</th>
+            <th>深</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+      <div id="eligibilitySection"></div>
+      <div class="inline-results-actions">
+        <button id="homeFromResultsBtn">回到首頁</button>
+      </div>
+    </div>
+
+    <div class="clear-module-section">
+      <button class="clear-module-btn" data-clear-module="stair">清除此評估的所有資料</button>
+    </div>
+  </section>
+
+  <!-- Wheelchair View -->
+  <section id="wheelchairView" style="display:none;">
+    <div id="wcFormContainer"></div>
+  </section>
+
+  <!-- Cushion View -->
+  <section id="cushionView" style="display:none;">
+    <div id="cushionFormContainer"></div>
+  </section>
+
+  <!-- Transfer View -->
+  <section id="transferView" style="display:none;">
+    <div id="transferFormContainer"></div>
+  </section>
+
+  <!-- Shower/Commode View -->
+  <section id="showerView" style="display:none;">
+    <div id="showerFormContainer"></div>
+  </section>
+
+  <!-- Walker View -->
+  <section id="walkerView" style="display:none;">
+    <div id="walkerFormContainer"></div>
+  </section>
+
+  <!-- Airbed View -->
+  <section id="airbedView" style="display:none;">
+    <div id="airbedFormContainer"></div>
+  </section>
+
+  <!-- Home Accessibility View -->
+  <section id="homeAccessibilityView" style="display:none;">
+    <div id="homeAccessibilityFormContainer"></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+<dialog class="backup-dialog" id="backupDialog">
+  <div class="backup-panel" id="backupPanel">
+    <div class="backup-panel-title">資料備份</div>
+    <div class="backup-panel-status" id="backupStatus"></div>
+    <div class="backup-actions">
+      <button type="button" class="backup-export" id="exportBackupBtn">匯出 JSON 備份</button>
+      <button type="button" id="importBackupBtn">匯入還原</button>
+    </div>
+    <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
+    <button type="button" class="backup-dialog-close" id="closeBackupDialogBtn">關閉</button>
+  </div>
+</dialog>
+<dialog class="backup-dialog" id="backupReminderDialog">
+  <div class="backup-panel">
+    <div class="backup-panel-title">備份提醒</div>
+    <div class="backup-panel-status" style="font-size:14px; color:var(--ink-soft); line-height:1.6;">已超過 7 天未匯出備份。要立即匯出 JSON 備份嗎？</div>
+    <div class="backup-actions">
+      <button type="button" id="skipBackupReminderBtn">否</button>
+      <button type="button" class="backup-export" id="confirmBackupReminderBtn">是，立即備份</button>
+    </div>
+  </div>
+</dialog>
+
+<button id="fabBack" aria-label="返回上一頁" style="display:none;">&#8592;</button>
+<script type="module" src="./assets/js/boot.js"></script>
+</body>
+</html>
