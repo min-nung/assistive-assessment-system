@@ -1,5 +1,6 @@
 import { state, defaultSubsidyCalc } from '../core/state.js';
 import { escapeHtml, escapeAttr } from '../core/dom.js';
+import { toNum } from './stair-eligibility.js';
 
 /* Subsidy catalogue, item collection, and calculation
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.

@@ -1,6 +1,7 @@
 import { state, saveState } from '../core/state.js';
 import { escapeHtml, escapeAttr } from '../core/dom.js';
 import { touchCase } from '../core/cases.js';
+import { toNum } from '../calculations/stair-eligibility.js';
 
 /* Home-accessibility form and calculations
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.
