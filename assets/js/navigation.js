@@ -22,9 +22,11 @@ function hideAllViews() {
   ['mainMenuView', 'listView', 'editorView', 'wheelchairView', 'cushionView', 'showerView', 'walkerView', 'transferView', 'airbedView', 'homeAccessibilityView'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
-  document.getElementById('dataManagementBtn').style.display = 'none';
-  const backupDialog = document.getElementById('backupDialog');
-  if (backupDialog.open) backupDialog.close();
+  document.getElementById('settingsBtn').style.display = 'none';
+  ['settingsDialog', 'backupDialog', 'versionDialog'].forEach(id => {
+    const dialog = document.getElementById(id);
+    if (dialog.open) dialog.close();
+  });
 }
 
 function showMainMenu(caseId) {
@@ -124,7 +126,7 @@ function showList() {
   hideAllViews();
   document.getElementById('listView').style.display = '';
   document.getElementById('backBtn').style.display = 'none';
-  document.getElementById('dataManagementBtn').style.display = '';
+  document.getElementById('settingsBtn').style.display = '';
   document.getElementById('headerTitle').textContent = '輔具評估系統';
   document.getElementById('subtitle').textContent = '個案清單';
   setBackFn(null);

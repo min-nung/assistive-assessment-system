@@ -31,6 +31,7 @@ import {
   renderGrabCalcResults, calcGrabBar
 } from './forms/home-accessibility.js';
 import { showToast, showSaved } from './ui.js';
+import { renderVersionInfo } from './version.js';
 
 /* DOM event bindings
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.
@@ -84,12 +85,23 @@ document.getElementById('createCaseBtn').addEventListener('click', () => {
 document.getElementById('newCaseName').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('createCaseBtn').click();
 });
-document.getElementById('dataManagementBtn').addEventListener('click', () => {
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('settingsDialog').showModal();
+});
+document.getElementById('closeSettingsDialogBtn').addEventListener('click', () => document.getElementById('settingsDialog').close());
+document.getElementById('openBackupBtn').addEventListener('click', () => {
+  document.getElementById('settingsDialog').close();
   const dialog = document.getElementById('backupDialog');
   renderBackupPanel();
   dialog.showModal();
 });
+document.getElementById('openVersionBtn').addEventListener('click', () => {
+  document.getElementById('settingsDialog').close();
+  renderVersionInfo();
+  document.getElementById('versionDialog').showModal();
+});
 document.getElementById('closeBackupDialogBtn').addEventListener('click', () => document.getElementById('backupDialog').close());
+document.getElementById('closeVersionDialogBtn').addEventListener('click', () => document.getElementById('versionDialog').close());
 document.getElementById('skipBackupReminderBtn').addEventListener('click', () => document.getElementById('backupReminderDialog').close());
 document.getElementById('confirmBackupReminderBtn').addEventListener('click', () => {
   document.getElementById('backupReminderDialog').close();

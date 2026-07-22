@@ -1,4 +1,4 @@
-const CACHE_NAME = 'assistive-assessment-modular-v3';
+const CACHE_NAME = 'assistive-assessment-modular-v4';
 const APP_SHELL = [
   './index_3.html',
   './assets/css/app.css',
@@ -20,6 +20,7 @@ const APP_SHELL = [
   './assets/js/forms/home-accessibility.js',
   './assets/js/backup/backup.js',
   './assets/js/ui.js',
+  './assets/js/version.js',
   './assets/js/events.js',
   './assets/js/boot.js'
 ];

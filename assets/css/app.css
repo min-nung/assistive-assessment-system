@@ -77,7 +77,7 @@
     position: absolute;
     left: 0;
   }
-  header.top .data-management-btn { position: absolute; right: 0; font-size: 20px; line-height: 1; }
+  header.top .settings-btn { position: absolute; right: 0; font-size: 20px; line-height: 1; }
   header.top .back-btn,
   header.top .action-btn {
     background: transparent;
@@ -259,6 +259,53 @@
   .backup-dialog::backdrop { background: rgba(17,24,39,0.5); }
   .backup-dialog .backup-panel { margin: 0; }
   .backup-dialog-close { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink-soft); font-size: 13px; }
+  .settings-panel,
+  .version-panel { padding: 16px; }
+  .settings-menu { display: grid; gap: 8px; margin-top: 12px; }
+  .settings-menu-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    text-align: left;
+  }
+  .settings-menu-item:active { background: var(--surface-2); }
+  .settings-menu-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--brand);
+    font-size: 19px;
+    font-weight: 700;
+  }
+  .settings-menu-text { display: grid; gap: 1px; flex: 1; }
+  .settings-menu-text strong { color: var(--ink); font-size: 14px; }
+  .settings-menu-text small { color: var(--muted); font-size: 12px; }
+  .settings-menu-arrow { color: var(--muted); font-size: 24px; line-height: 1; }
+  .version-current {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    text-align: center;
+  }
+  .version-number { color: var(--brand); font-size: 23px; font-weight: 800; letter-spacing: 0.4px; }
+  .version-date { margin-top: 2px; color: var(--ink-soft); font-size: 12px; }
+  .version-release { padding: 14px 2px 4px; }
+  .version-release + .version-release { border-top: 1px solid var(--line); margin-top: 10px; }
+  .version-release-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .version-release-title strong { color: var(--ink-soft); font-size: 14px; }
+  .version-release-title time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .version-updates { margin: 8px 0 0; padding-left: 22px; color: var(--ink-soft); font-size: 13px; }
+  .version-updates li + li { margin-top: 5px; }
 
   /* ---------- Editor Blocks ---------- */
   .case-title-wrap {

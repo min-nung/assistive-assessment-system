@@ -15,7 +15,7 @@
     <div class="bar">
       <button class="back-btn" id="backBtn" style="display:none;">‹ 返回</button>
       <h1 id="headerTitle">輔具評估系統</h1>
-      <button class="action-btn data-management-btn" id="dataManagementBtn" style="display:none;" aria-label="資料管理">⋯</button>
+      <button class="action-btn settings-btn" id="settingsBtn" style="display:none;" aria-label="設定" title="設定">⋯</button>
     </div>
     <div class="subtitle" id="subtitle">選擇評估項目</div>
   </header>
@@ -148,6 +148,30 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<dialog class="backup-dialog settings-dialog" id="settingsDialog" aria-labelledby="settingsDialogTitle">
+  <div class="settings-panel">
+    <div class="backup-panel-title" id="settingsDialogTitle">設定</div>
+    <div class="settings-menu">
+      <button type="button" class="settings-menu-item" id="openBackupBtn">
+        <span class="settings-menu-icon" aria-hidden="true">↕</span>
+        <span class="settings-menu-text">
+          <strong>資料備份</strong>
+          <small>匯出或匯入 JSON 備份</small>
+        </span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </button>
+      <button type="button" class="settings-menu-item" id="openVersionBtn">
+        <span class="settings-menu-icon" aria-hidden="true">ⓘ</span>
+        <span class="settings-menu-text">
+          <strong>目前版本</strong>
+          <small>查看版本與更新項目</small>
+        </span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </button>
+    </div>
+    <button type="button" class="backup-dialog-close" id="closeSettingsDialogBtn">關閉</button>
+  </div>
+</dialog>
 <dialog class="backup-dialog" id="backupDialog">
   <div class="backup-panel" id="backupPanel">
     <div class="backup-panel-title">資料備份</div>
@@ -158,6 +182,13 @@
     </div>
     <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
     <button type="button" class="backup-dialog-close" id="closeBackupDialogBtn">關閉</button>
+  </div>
+</dialog>
+<dialog class="backup-dialog version-dialog" id="versionDialog" aria-labelledby="versionDialogTitle">
+  <div class="version-panel">
+    <div class="backup-panel-title" id="versionDialogTitle">目前版本</div>
+    <div id="versionContent"></div>
+    <button type="button" class="backup-dialog-close" id="closeVersionDialogBtn">關閉</button>
   </div>
 </dialog>
 <dialog class="backup-dialog" id="backupReminderDialog">
