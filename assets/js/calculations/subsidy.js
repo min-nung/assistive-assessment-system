@@ -151,6 +151,19 @@ function wcComboKey(baseType, addons) {
   return key;
 }
 
+function walkerHasAssessmentData(walker) {
+  if (!walker) return false;
+  // 保留舊版已勾選結果的相容性；新版則由實際評估內容自動判定。
+  if (walker.walkerResult === true) return true;
+  const ignoredFields = new Set(['walkerResult', 'subsidy', 'exemptItems']);
+  return Object.entries(walker).some(([field, value]) => {
+    if (ignoredFields.has(field)) return false;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'string') return value.trim() !== '';
+    return value === true;
+  });
+}
+
 // 居家無障礙 item + 規格 → 對照表鍵
 function haSubsidyKey(item, spec) {
   switch (item) {
@@ -220,8 +233,8 @@ function collectSubsidyItems(c) {
   // 氣墊床：assessmentResult slug
   const abMap = { 'airbed':'ab_airbed','electric_bed':'ab_electric_bed' };
   (c.airbed && c.airbed.assessmentResult || []).forEach(v => { if (abMap[v]) add(abMap[v], abMap[v], '氣墊床／電動床', 'device'); });
-  // 助行器
-  if (c.walker && c.walker.walkerResult === true) add('wk_rollator', 'wk_rollator', '帶輪型助步車', 'device');
+  // 帶輪型助步車只有單一建議品項；模組有評估資料時自動納入，不需額外勾選。
+  if (walkerHasAssessmentData(c.walker)) add('wk_rollator', 'wk_rollator', '帶輪型助步車', 'device');
   // 爬梯機（有量測資料即視為建議）
   if (Array.isArray(c.blocks) && c.blocks.some(b => b.type === 'stair' && Array.isArray(b.steps) && b.steps.some(s => s.height || s.slope))) {
     add('st_climber', 'st_climber', '爬梯機', 'device');
@@ -490,6 +503,6 @@ function renderSubsidyCalc(caseId) {
 }
 
 export {
-  SUBSIDY_TABLE, defaultSubsidyCalc, wcComboKey, haSubsidyKey,
+  SUBSIDY_TABLE, defaultSubsidyCalc, wcComboKey, walkerHasAssessmentData, haSubsidyKey,
   fixedHandrailLength, collectSubsidyItems, computeSubsidy, renderSubsidyCalc
 };

@@ -77,6 +77,19 @@ function renderCushionForm(caseId) {
 
   document.getElementById('cushionFormContainer').innerHTML = `
   <div class="wc-section">
+    <h3>建議輔具</h3>
+    <div class="wc-options">
+      ${csC('assessmentResult','interconnected_basic','連通管氣囊輪椅座墊－基礎型')}
+      ${csC('assessmentResult','interconnected_rubber_basic','連通管氣囊輪椅座墊－橡膠材質基礎型')}
+      ${csC('assessmentResult','interconnected_rubber_zone','連通管氣囊輪椅座墊－橡膠材質分區型')}
+      ${csC('assessmentResult','liquid_gel','液態凝膠輪椅座墊')}
+      ${csC('assessmentResult','solid_gel','固態凝膠輪椅座墊')}
+      ${csC('assessmentResult','filled_air','填充式氣囊輪椅座墊')}
+      ${csC('assessmentResult','custom_foam','客製化適形泡棉輪椅座墊')}
+    </div>
+  </div>
+
+  <div class="wc-section">
     <h3>1. 身體尺寸量測</h3>
     <div class="wc-field">
       <label class="wc-label">臀寬</label>
@@ -461,19 +474,6 @@ function renderCushionForm(caseId) {
     <div class="wc-field" style="margin-top:8px;">
       <label class="wc-label">備註說明</label>
       <input type="text" class="wc-input" data-cs-field="sittingDurationNote" value="${escapeAttr(cs.sittingDurationNote)}" placeholder="填寫說明">
-    </div>
-  </div>
-
-  <div class="wc-section">
-    <h3>9. 評估結果（可複選）</h3>
-    <div class="wc-options">
-      ${csC('assessmentResult','interconnected_basic','連通管氣囊輪椅座墊－基礎型')}
-      ${csC('assessmentResult','interconnected_rubber_basic','連通管氣囊輪椅座墊－橡膠材質基礎型')}
-      ${csC('assessmentResult','interconnected_rubber_zone','連通管氣囊輪椅座墊－橡膠材質分區型')}
-      ${csC('assessmentResult','liquid_gel','液態凝膠輪椅座墊')}
-      ${csC('assessmentResult','solid_gel','固態凝膠輪椅座墊')}
-      ${csC('assessmentResult','filled_air','填充式氣囊輪椅座墊')}
-      ${csC('assessmentResult','custom_foam','客製化適形泡棉輪椅座墊')}
     </div>
   </div>
 

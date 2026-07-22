@@ -2,6 +2,17 @@
 // both the current version and its update history.
 const VERSION_HISTORY = Object.freeze([
   Object.freeze({
+    version: '1.3',
+    date: '2026-07-23',
+    title: '建議輔具移至表單頂部',
+    updates: Object.freeze([
+      '移位輔具、輪椅座墊、氣墊床／電動床、輪椅及沐浴椅／便盆椅的建議輔具移至頁面最上方。',
+      '原「評估結果」欄位統一更名為「建議輔具」，並移除前方編號。',
+      '輪椅建議尺寸移至建議輔具下方，方便立即查看。',
+      '帶輪型助步車移除單一結果選項，填有評估資料時自動納入建議與補助試算。'
+    ])
+  }),
+  Object.freeze({
     version: '1.2',
     date: '2026-07-23',
     title: '改善個案與沐浴椅操作',

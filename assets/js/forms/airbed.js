@@ -83,6 +83,16 @@ function renderAirbedForm(caseId) {
 
   document.getElementById('airbedFormContainer').innerHTML = `
   <div class="wc-section">
+    <h3>建議輔具</h3>
+    <div class="wc-field">
+      <div class="wc-options">
+        ${abC('assessmentResult','airbed','氣墊床')}
+        ${abC('assessmentResult','electric_bed','電動床')}
+      </div>
+    </div>
+  </div>
+
+  <div class="wc-section">
     <h3>1. 目前使用的床墊</h3>
     <div class="wc-field">
       <label class="wc-label">1-1 床墊種類</label>
@@ -483,16 +493,6 @@ function renderAirbedForm(caseId) {
             ${abRI('piGrade','dti','深層組織壓傷')}
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="wc-section">
-    <h3>20. 評估結果（可複選）</h3>
-    <div class="wc-field">
-      <div class="wc-options">
-        ${abC('assessmentResult','airbed','氣墊床')}
-        ${abC('assessmentResult','electric_bed','電動床')}
       </div>
     </div>
   </div>

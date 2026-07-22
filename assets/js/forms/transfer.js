@@ -31,6 +31,21 @@ function renderTransferForm(caseId) {
 
   document.getElementById('transferFormContainer').innerHTML = `
   <div class="wc-section">
+    <h3>建議輔具</h3>
+    <div class="wc-options">
+      ${tfC('resultItems','移位腰帶','移位腰帶')}
+      ${tfC('resultItems','移位轉盤','移位轉盤')}
+      ${tfC('resultItems','移位板','移位板')}
+      ${tfC('resultItems','人力移位吊帶','人力移位吊帶')}
+      ${tfC('resultItems','移位滑布','移位滑布')}
+      ${tfC('resultItems','躺式移位滑墊','躺式移位滑墊')}
+      ${tfC('resultItems','移位機-人力型','移位機－人力型')}
+      ${tfC('resultItems','移位機-電動型','移位機－電動型')}
+      ${tfC('resultItems','移位機吊帶','移位機吊帶')}
+    </div>
+  </div>
+
+  <div class="wc-section">
     <h3>1. 評估項目</h3>
 
     <div class="wc-field">
@@ -70,21 +85,6 @@ function renderTransferForm(caseId) {
           ${tfR('sitToStand','unable','無法站起')}
         </div>
       </div>
-    </div>
-  </div>
-
-  <div class="wc-section">
-    <h3>2. 評估結果</h3>
-    <div class="wc-options">
-      ${tfC('resultItems','移位腰帶','移位腰帶')}
-      ${tfC('resultItems','移位轉盤','移位轉盤')}
-      ${tfC('resultItems','移位板','移位板')}
-      ${tfC('resultItems','人力移位吊帶','人力移位吊帶')}
-      ${tfC('resultItems','移位滑布','移位滑布')}
-      ${tfC('resultItems','躺式移位滑墊','躺式移位滑墊')}
-      ${tfC('resultItems','移位機-人力型','移位機－人力型')}
-      ${tfC('resultItems','移位機-電動型','移位機－電動型')}
-      ${tfC('resultItems','移位機吊帶','移位機吊帶')}
     </div>
   </div>
 

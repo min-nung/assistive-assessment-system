@@ -175,15 +175,6 @@ function renderWalkerForm(caseId) {
     </div>
   </div>
 
-  <div class="wc-section">
-    <h3>10. 評估結果</h3>
-    <div class="wc-options">
-      <label class="wc-option-label">
-        <input type="checkbox" data-wk-bool="walkerResult" ${wk.walkerResult?'checked':''}> 帶輪型助步車
-      </label>
-    </div>
-  </div>
-
   <div class="clear-module-section">
     <button class="clear-module-btn" data-clear-module="walker">清除此評估的所有資料</button>
   </div>

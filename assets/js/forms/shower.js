@@ -35,6 +35,31 @@ function renderShowerForm(caseId) {
 
   document.getElementById('showerFormContainer').innerHTML = `
   <div class="wc-section">
+    <h3>建議輔具</h3>
+    <div class="wc-field">
+      <label class="wc-label">基本型（單選）</label>
+      <div class="wc-options">
+        ${shResultR('baseType','shower','沐浴椅')}
+        ${shResultR('baseType','commode','便盆椅')}
+      </div>
+    </div>
+    <div class="wc-field${sh.baseType ? '' : ' wc-field-disabled'}">
+      <label class="wc-label">附加功能（需要的項目逐項勾選）</label>
+      <div class="wc-options">
+        ${SHOWER_ADDON_OPTIONS.map(([value, label]) => `<label class="wc-option-label"><input type="checkbox" data-sh-checkbox="addons" value="${value}" ${!sh.baseType ? 'disabled' : ''} ${Array.isArray(sh.addons) && sh.addons.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}
+      </div>
+    </div>
+    <div class="wc-field">
+      <label class="wc-label">其他品項（可複選）</label>
+      <div class="wc-options">
+        ${shC('subsidyItems','項次163','項次163 移動式身體清洗槽－局部型')}
+        ${shC('subsidyItems','項次164','項次164 移動式身體清洗槽－全身型')}
+        ${shC('subsidyItems','項次166','項次166 馬桶增高器')}
+      </div>
+    </div>
+  </div>
+
+  <div class="wc-section">
     <h3>1. 評估項目</h3>
 
     <div class="wc-field">
@@ -152,31 +177,6 @@ function renderShowerForm(caseId) {
         ${shC('bathroomDifficulty','步行至浴廁有安全疑慮','步行至浴廁有安全疑慮')}
         ${shC('bathroomDifficulty','無法步行至浴廁','無法步行至浴廁')}
         ${shC('bathroomDifficulty','無法以下肢承重轉位','無法以下肢承重轉位')}
-      </div>
-    </div>
-  </div>
-
-  <div class="wc-section">
-    <h3>2. 評估結果</h3>
-    <div class="wc-field">
-      <label class="wc-label">基本型（單選）</label>
-      <div class="wc-options">
-        ${shResultR('baseType','shower','沐浴椅')}
-        ${shResultR('baseType','commode','便盆椅')}
-      </div>
-    </div>
-    <div class="wc-field${sh.baseType ? '' : ' wc-field-disabled'}">
-      <label class="wc-label">附加功能（需要的項目逐項勾選）</label>
-      <div class="wc-options">
-        ${SHOWER_ADDON_OPTIONS.map(([value, label]) => `<label class="wc-option-label"><input type="checkbox" data-sh-checkbox="addons" value="${value}" ${!sh.baseType ? 'disabled' : ''} ${Array.isArray(sh.addons) && sh.addons.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}
-      </div>
-    </div>
-    <div class="wc-field">
-      <label class="wc-label">其他品項（可複選）</label>
-      <div class="wc-options">
-        ${shC('subsidyItems','項次163','項次163 移動式身體清洗槽－局部型')}
-        ${shC('subsidyItems','項次164','項次164 移動式身體清洗槽－全身型')}
-        ${shC('subsidyItems','項次166','項次166 馬桶增高器')}
       </div>
     </div>
   </div>
