@@ -4,7 +4,7 @@ import {
   defaultExemptDevices, defaultSubsidyCalc, saveState, uid, runBackFn
 } from './core/state.js';
 import {
-  createCase, deleteCase, touchCase, updateField, addBlock, addStep, removeStep,
+  createCase, deleteCase, touchCase, renameCurrentCase, updateField, addBlock, addStep, removeStep,
   removeBlock, insertStepRow
 } from './core/cases.js';
 import { escapeHtml } from './core/dom.js';
@@ -84,6 +84,15 @@ document.getElementById('createCaseBtn').addEventListener('click', () => {
 });
 document.getElementById('newCaseName').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('createCaseBtn').click();
+});
+document.getElementById('editCaseNameBtn').addEventListener('click', () => {
+  const c = state.cases[state.currentCaseId];
+  if (!c) return;
+  const newName = prompt('修改個案名稱', c.name);
+  if (newName === null || !renameCurrentCase(newName)) return;
+  document.getElementById('headerTitle').textContent = c.name;
+  document.getElementById('editCaseNameBtn').setAttribute('aria-label', `修改個案名稱：${c.name}`);
+  showToast('個案名稱已更新');
 });
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').showModal();
@@ -498,7 +507,6 @@ document.getElementById('showerView').addEventListener('change', e => {
       document.querySelectorAll(`[data-sh-radio="baseType"]`).forEach(el => { if (el !== t) el.checked = false; });
     }
     c.shower.baseType = newVal;
-    if (!c.shower.addonLevel) c.shower.addonLevel = 'wheel';
     touchCase(c.id); saveState(); showSaved();
     renderShowerForm(c.id);
   } else if (radioField) {

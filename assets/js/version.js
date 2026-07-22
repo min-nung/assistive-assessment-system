@@ -2,7 +2,18 @@
 // both the current version and its update history.
 const VERSION_HISTORY = Object.freeze([
   Object.freeze({
-    version: '2026.07.23',
+    version: '1.2',
+    date: '2026-07-23',
+    title: '改善個案與沐浴椅操作',
+    updates: Object.freeze([
+      '選擇評估項目頁面的個案名稱旁新增修改圖示。',
+      '可直接修改個案名稱，並檢查空白、字數上限與重複名稱。',
+      '沐浴椅／便盆椅的附加功能改為逐項條列勾選，不再使用累加等級。',
+      '補助試算會依實際勾選的附加功能組合計算。'
+    ])
+  }),
+  Object.freeze({
+    version: '1.1',
     date: '2026-07-23',
     title: '新增版本追蹤',
     updates: Object.freeze([

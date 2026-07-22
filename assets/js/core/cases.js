@@ -64,22 +64,28 @@ function touchCase(id) {
 function renameCurrentCase(newName) {
   const trimmed = (newName || '').trim();
   const c = state.cases[state.currentCaseId];
-  if (!c) return;
+  if (!c) return false;
   if (!trimmed) {
-    // Ignore blank (revert on blur elsewhere)
-    return;
+    showToast('請輸入個案名稱');
+    return false;
+  }
+  if (trimmed.length > 40) {
+    showToast('個案名稱最多 40 個字');
+    return false;
   }
   // Check for collision with other cases
   for (const id in state.cases) {
     if (id !== c.id && state.cases[id].name === trimmed) {
       showToast('已存在相同名稱的個案');
-      return;
+      return false;
     }
   }
+  if (c.name === trimmed) return true;
   c.name = trimmed;
   touchCase(c.id);
   saveState();
   showSaved();
+  return true;
 }
 
 /* ==========================================================================

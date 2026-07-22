@@ -1,4 +1,6 @@
-import { state, defaultSubsidyCalc } from '../core/state.js';
+import {
+  state, defaultSubsidyCalc, SHOWER_ADDON_OPTIONS, showerComboKey
+} from '../core/state.js';
 import { escapeHtml, escapeAttr } from '../core/dom.js';
 import { toNum } from './stair-eligibility.js';
 
@@ -33,7 +35,7 @@ const SUBSIDY_TABLE = {
   sh_170: { label:'沐浴／便盆椅附加－利於移位扶手', dis:[1000,750,500],  ltc:null },
   sh_171: { label:'沐浴／便盆椅附加－仰躺功能',   dis:[1500,1125,750], ltc:null },
   sh_172: { label:'沐浴／便盆椅附加－空中傾倒功能', dis:[3500,2625,1750], ltc:null },
-  // 沐浴椅／便盆椅 評估結果組合鍵：基本型（單選）＋附加功能等級（單選，累加式）；
+  // 沐浴椅／便盆椅的常用組合；其他獨立勾選組合會由 ensureShowerSubsidyEntry 即時計算。
   // 身障＝基本型＋各附加項相加，長照＝固定合併價（不因附加功能變動，來源見上方備註）
   sh_167__wheel:                       { label:'沐浴椅＋附輪',                     dis:[1900,1425,950],  ltc:[1200,1080,840] },
   sh_167__wheel_transfer:              { label:'沐浴椅＋附輪＋利於移位',           dis:[2900,2175,1450], ltc:[1200,1080,840] },
@@ -113,6 +115,28 @@ const SUBSIDY_TABLE = {
     ltcVariants:[ { key:'default', label:'助行器', amts:[800,720,560] } ] }
 };
 
+const SHOWER_ADDON_SUBSIDY_KEYS = Object.freeze({
+  wheel: 'sh_169', transfer: 'sh_170', recline: 'sh_171', tilt: 'sh_172'
+});
+
+function ensureShowerSubsidyEntry(baseType, addons) {
+  const key = showerComboKey(baseType, addons);
+  if (!key || SUBSIDY_TABLE[key]) return key;
+
+  const baseKey = baseType === 'shower' ? 'sh_167' : 'sh_168';
+  const base = SUBSIDY_TABLE[baseKey];
+  const selected = SHOWER_ADDON_OPTIONS
+    .filter(([value]) => Array.isArray(addons) && addons.includes(value))
+    .map(([value]) => SUBSIDY_TABLE[SHOWER_ADDON_SUBSIDY_KEYS[value]]);
+
+  SUBSIDY_TABLE[key] = {
+    label: [base.label, ...selected.map(item => item.label.replace('沐浴／便盆椅附加－', ''))].join('＋'),
+    dis: base.dis.map((amount, econ) => amount + selected.reduce((sum, item) => sum + item.dis[econ], 0)),
+    ltc: base.ltc.slice()
+  };
+  return key;
+}
+
 // 輪椅基本型 + 附加功能（可複選）→ 對照表鍵；仰躺／傾倒僅在已選移位時才計入組合
 function wcComboKey(baseType, addons) {
   if (baseType === 'non_light') return 'wc_non_light';
@@ -178,9 +202,9 @@ function collectSubsidyItems(c) {
     const key = wcComboKey(c.wheelchair.wcBaseType, c.wheelchair.wcAddons);
     if (key) add(key, key, '輪椅', 'device', key.startsWith('wc_light') ? 'wc_light' : null);
   }
-  // 沐浴椅／便盆椅：基本型（單選）＋附加功能等級（單選，累加式）→ 組合鍵，整件算 1 項
+  // 沐浴椅／便盆椅：基本型（單選）＋附加功能（各自勾選）→ 組合鍵，整件算 1 項
   if (c.shower && c.shower.baseType) {
-    const key = showerComboKey(c.shower.baseType, c.shower.addonLevel);
+    const key = ensureShowerSubsidyEntry(c.shower.baseType, c.shower.addons);
     const family = c.shower.baseType === 'shower' ? 'sh_shower' : c.shower.baseType === 'commode' ? 'sh_commode' : null;
     if (key) add(key, key, '沐浴椅／便盆椅', 'device', family);
   }

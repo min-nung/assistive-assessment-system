@@ -1,4 +1,4 @@
-import { state, saveState, SHOWER_ADDON_LEVELS } from '../core/state.js';
+import { state, saveState, SHOWER_ADDON_OPTIONS } from '../core/state.js';
 import { escapeHtml, escapeAttr } from '../core/dom.js';
 import { touchCase } from '../core/cases.js';
 import { showSaved } from '../ui.js';
@@ -23,6 +23,10 @@ function renderShowerForm(caseId) {
   function shC(field, val, label) {
     const arr = Array.isArray(sh[field]) ? sh[field] : [];
     return `<label class="wc-option-label"><input type="checkbox" data-sh-checkbox="${field}" value="${escapeAttr(val)}" ${arr.includes(val)?'checked':''}> ${label}</label>`;
+  }
+  function shResultR(field, val, label) {
+    const id = `sh-result-${field}-${val}`;
+    return `<label class="wc-option-label" for="${id}"><input type="radio" id="${id}" name="sh_${field}" data-sh-radio="${field}" value="${escapeAttr(val)}" ${sh[field]===val?'checked':''}> ${label}</label>`;
   }
 
   const spineOtherVis = Array.isArray(sh.spine) && sh.spine.includes('其他變形') ? 'visible' : '';
@@ -157,14 +161,14 @@ function renderShowerForm(caseId) {
     <div class="wc-field">
       <label class="wc-label">基本型（單選）</label>
       <div class="wc-options">
-        ${shR('baseType','shower','沐浴椅')}
-        ${shR('baseType','commode','便盆椅')}
+        ${shResultR('baseType','shower','沐浴椅')}
+        ${shResultR('baseType','commode','便盆椅')}
       </div>
     </div>
     <div class="wc-field${sh.baseType ? '' : ' wc-field-disabled'}">
-      <label class="wc-label">附加功能（單選，累加式）</label>
+      <label class="wc-label">附加功能（需要的項目逐項勾選）</label>
       <div class="wc-options">
-        ${SHOWER_ADDON_LEVELS.map(([lv, label]) => `<label class="wc-option-label"><input type="checkbox" data-sh-radio="addonLevel" value="${lv}" ${!sh.baseType ? 'disabled' : ''} ${(sh.addonLevel || 'wheel') === lv ? 'checked' : ''}> ${label}</label>`).join('')}
+        ${SHOWER_ADDON_OPTIONS.map(([value, label]) => `<label class="wc-option-label"><input type="checkbox" data-sh-checkbox="addons" value="${value}" ${!sh.baseType ? 'disabled' : ''} ${Array.isArray(sh.addons) && sh.addons.includes(value) ? 'checked' : ''}> ${label}</label>`).join('')}
       </div>
     </div>
     <div class="wc-field">

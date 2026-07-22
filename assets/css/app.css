@@ -73,6 +73,37 @@
     flex: 1;
     text-align: center;
   }
+  header.top .header-title-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex: 1;
+    min-width: 0;
+    padding: 0 62px;
+  }
+  header.top .header-title-wrap h1 {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  header.top .case-name-edit-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 50%;
+    background: rgba(255,255,255,0.14);
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+  }
+  header.top .case-name-edit-btn:active { background: rgba(0,0,0,0.18); }
   header.top .back-btn {
     position: absolute;
     left: 0;

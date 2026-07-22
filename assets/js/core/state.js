@@ -73,23 +73,27 @@ function defaultShower() {
     headControl: '',
     sittingBalance: '', fallingDirection: [],
     bathroomDifficulty: [],
-    baseType: '', addonLevel: 'wheel',
+    baseType: '', addons: [],
     subsidyItems: [], subsidy: [], exemptItems: ''
   };
 }
 
-// 沐浴椅／便盆椅：基本型（單選）＋附加功能等級（單選，累加式）→ 對照表鍵
-const SHOWER_ADDON_LEVELS = [
+// 沐浴椅／便盆椅：基本型單選，附加功能則各自獨立勾選。
+const SHOWER_ADDON_OPTIONS = [
   ['wheel', '附輪'],
-  ['wheel_transfer', '附輪＋利於移位'],
-  ['wheel_transfer_recline', '附輪＋利於移位＋仰躺功能'],
-  ['wheel_transfer_tilt', '附輪＋利於移位＋空中傾倒功能'],
-  ['wheel_transfer_recline_tilt', '附輪＋利於移位＋仰躺功能＋空中傾倒功能']
+  ['transfer', '具利於移位扶手'],
+  ['recline', '具仰躺功能'],
+  ['tilt', '具空中傾倒功能']
 ];
-function showerComboKey(baseType, addonLevel) {
+function showerComboKey(baseType, addons) {
   if (baseType !== 'shower' && baseType !== 'commode') return null;
   const base = baseType === 'shower' ? 'sh_167' : 'sh_168';
-  return base + '__' + (addonLevel || 'wheel');
+  const selected = Array.isArray(addons) ? addons : [];
+  const suffix = SHOWER_ADDON_OPTIONS
+    .map(([value]) => value)
+    .filter(value => selected.includes(value))
+    .join('_');
+  return suffix ? `${base}__${suffix}` : base;
 }
 
 function defaultWalker() {
@@ -234,24 +238,30 @@ function migrateCases(cases) {
     if (!c.airbed)    c.airbed    = defaultAirbed();
     if (!c.walker)    c.walker    = defaultWalker();
     if (!c.shower)    c.shower    = defaultShower();
-    // Migrate: 沐浴椅／便盆椅 舊版「項次167/168＋169-172」勾選 → 新版 baseType/addonLevel 單選組合
+    // Migrate: 舊版「項次167/168＋169-172」勾選 → 基本型單選＋附加功能獨立勾選
     if (c.shower.baseType === undefined) {
       const items = Array.isArray(c.shower.subsidyItems) ? c.shower.subsidyItems : [];
       let baseType = '';
       if (items.includes('項次167')) baseType = 'shower';
       else if (items.includes('項次168')) baseType = 'commode';
-      let addonLevel = 'wheel';
-      const hasTransfer = items.includes('項次170');
-      const hasRecline = items.includes('項次171');
-      const hasTilt = items.includes('項次172');
-      if (hasTransfer && hasRecline && hasTilt) addonLevel = 'wheel_transfer_recline_tilt';
-      else if (hasTransfer && hasTilt) addonLevel = 'wheel_transfer_tilt';
-      else if (hasTransfer && hasRecline) addonLevel = 'wheel_transfer_recline';
-      else if (hasTransfer) addonLevel = 'wheel_transfer';
       c.shower.baseType = baseType;
-      c.shower.addonLevel = addonLevel;
+      c.shower.addons = [];
+      if (items.includes('項次169')) c.shower.addons.push('wheel');
+      if (items.includes('項次170')) c.shower.addons.push('transfer');
+      if (items.includes('項次171')) c.shower.addons.push('recline');
+      if (items.includes('項次172')) c.shower.addons.push('tilt');
       c.shower.subsidyItems = items.filter(v => !['項次167','項次168','項次169','項次170','項次171','項次172'].includes(v));
     }
+    // Migrate: 累加式 addonLevel → 各功能獨立 addons 陣列
+    if (!Array.isArray(c.shower.addons)) {
+      const oldLevel = c.shower.baseType && typeof c.shower.addonLevel === 'string'
+        ? c.shower.addonLevel.split('_')
+        : [];
+      c.shower.addons = SHOWER_ADDON_OPTIONS
+        .map(([value]) => value)
+        .filter(value => oldLevel.includes(value));
+    }
+    delete c.shower.addonLevel;
     if (!c.homeAccessibility) c.homeAccessibility = defaultHomeAccessibility();
     if (!c.exemptDevices) c.exemptDevices = defaultExemptDevices();
     if (!c.subsidyCalc) c.subsidyCalc = defaultSubsidyCalc();
@@ -329,7 +339,7 @@ function uid() {
 export {
   STORAGE_KEY, BACKUP_DATE_KEY, BACKUP_REMINDER_KEY, BACKUP_REMINDER_DAYS,
   state, defaultBasicInfo, defaultWheelchair, defaultExemptDevices,
-  defaultShower, SHOWER_ADDON_LEVELS, showerComboKey, defaultWalker,
+  defaultShower, SHOWER_ADDON_OPTIONS, showerComboKey, defaultWalker,
   defaultTransfer, defaultCushion, defaultAirbed, defaultHomeAccessibility, defaultSubsidyCalc,
   migrateCases, loadState, persistCases, saveState, uid, setBackFn, runBackFn
 };

@@ -23,6 +23,7 @@ function hideAllViews() {
     document.getElementById(id).style.display = 'none';
   });
   document.getElementById('settingsBtn').style.display = 'none';
+  document.getElementById('editCaseNameBtn').style.display = 'none';
   ['settingsDialog', 'backupDialog', 'versionDialog'].forEach(id => {
     const dialog = document.getElementById(id);
     if (dialog.open) dialog.close();
@@ -36,6 +37,9 @@ function showMainMenu(caseId) {
   document.getElementById('backBtn').style.display = '';
   const c = state.cases[state.currentCaseId];
   document.getElementById('headerTitle').textContent = c ? c.name : '輔具評估系統';
+  const editCaseNameBtn = document.getElementById('editCaseNameBtn');
+  editCaseNameBtn.style.display = c ? '' : 'none';
+  editCaseNameBtn.setAttribute('aria-label', c ? `修改個案名稱：${c.name}` : '修改個案名稱');
   document.getElementById('subtitle').textContent = '請選擇評估項目';
   setBackFn(showList);
   renderMenuBasicInfo();
