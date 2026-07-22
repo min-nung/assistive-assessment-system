@@ -9,6 +9,15 @@ import { escapeHtml, domIdToken } from '../core/dom.js';
    ========================================================================== */
 let editingCaseId = null;
 
+function toggleEditingCase(caseId) {
+  editingCaseId = editingCaseId === caseId ? null : caseId;
+  return editingCaseId;
+}
+
+function clearEditingCase() {
+  editingCaseId = null;
+}
+
 function moduleHasData(c, key) {
   switch (key) {
     case 'stair': return !!(c.blocks && c.blocks.some(b => b.type === 'stair' && b.steps.some(s => s.height || s.slope)));
@@ -103,4 +112,7 @@ function fmtAssessmentDate(d) {
   return formatted;
 }
 
-export { moduleHasData, renderList, formatDate, fmtAssessmentDate };
+export {
+  moduleHasData, renderList, formatDate, fmtAssessmentDate,
+  toggleEditingCase, clearEditingCase
+};

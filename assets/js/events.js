@@ -8,7 +8,9 @@ import {
   removeBlock, insertStepRow
 } from './core/cases.js';
 import { escapeHtml } from './core/dom.js';
-import { moduleHasData, renderList } from './views/case-list.js';
+import {
+  moduleHasData, renderList, toggleEditingCase, clearEditingCase
+} from './views/case-list.js';
 import {
   showMainMenu, showList, showEditor, showWheelchair, showCushion,
   showTransfer, showShower, showWalker, showAirbed, showHomeAccessibility
@@ -109,7 +111,7 @@ document.getElementById('caseList').addEventListener('click', e => {
   // 修改/完成按鈕：切換 badge 編輯模式
   const toggleId = e.target.getAttribute('data-toggle-edit');
   if (toggleId) {
-    editingCaseId = editingCaseId === toggleId ? null : toggleId;
+    toggleEditingCase(toggleId);
     renderList();
     return;
   }
@@ -153,7 +155,7 @@ document.getElementById('caseList').addEventListener('click', e => {
   if (e.target.closest('button')) return;
   const card = e.target.closest('[data-open-case]');
   if (card) {
-    editingCaseId = null;
+    clearEditingCase();
     showMainMenu(card.getAttribute('data-open-case'));
   }
 });
