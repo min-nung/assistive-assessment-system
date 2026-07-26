@@ -220,6 +220,26 @@
     </div>
   </div>
 </dialog>
+<dialog class="backup-dialog" id="conflictDialog" aria-labelledby="conflictDialogTitle">
+  <div class="backup-panel">
+    <div class="backup-panel-title" id="conflictDialogTitle">雲端資料有較新的版本</div>
+    <div class="backup-panel-status">另一台裝置曾寫入資料。系統不會自動合併，請選擇要保留哪一份。</div>
+    <div class="conflict-snapshot">
+      <div class="conflict-snapshot-label">本機</div>
+      <div class="backup-panel-status" id="conflictLocalDetail"></div>
+    </div>
+    <div class="conflict-snapshot">
+      <div class="conflict-snapshot-label">雲端</div>
+      <div class="backup-panel-status" id="conflictCloudDetail"></div>
+    </div>
+    <div class="backup-panel-status" style="color:#b45309;">採用雲端前會自動匯出目前的本機資料作為保險。</div>
+    <div class="backup-actions">
+      <button type="button" id="keepLocalBtn">保留本機</button>
+      <button type="button" class="backup-export" id="useCloudBtn">採用雲端</button>
+    </div>
+    <button type="button" class="backup-dialog-close" id="deferConflictBtn">先不要決定</button>
+  </div>
+</dialog>
 <dialog class="backup-dialog version-dialog" id="versionDialog" aria-labelledby="versionDialogTitle">
   <div class="version-panel">
     <div class="backup-panel-title" id="versionDialogTitle">目前版本</div>

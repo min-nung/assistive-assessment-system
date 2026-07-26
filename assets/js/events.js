@@ -34,7 +34,7 @@ import { showToast, showSaved } from './ui.js';
 import { renderVersionInfo } from './version.js';
 import {
   openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink,
-  confirmCloudRestore, skipCloudRestore
+  confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict
 } from './cloud/cloud-ui.js';
 
 /* DOM event bindings
@@ -117,6 +117,21 @@ document.getElementById('linkCloudBtn').addEventListener('click', linkCloudAccou
 document.getElementById('unlinkCloudBtn').addEventListener('click', unlinkCloudAccount);
 document.getElementById('confirmRestoreBtn').addEventListener('click', confirmCloudRestore);
 document.getElementById('skipRestoreBtn').addEventListener('click', skipCloudRestore);
+document.getElementById('cloudUploadStatus').addEventListener('click', e => {
+  if (e.currentTarget.classList.contains('cloud-upload-status-actionable')) openConflictDialog();
+});
+// role="button" without keyboard activation would leave a keyboard user able
+// to focus this element but not act on it — Enter/Space must work the same
+// as a click, per the role this element claims when a conflict is pending.
+document.getElementById('cloudUploadStatus').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (!e.currentTarget.classList.contains('cloud-upload-status-actionable')) return;
+  e.preventDefault();
+  openConflictDialog();
+});
+document.getElementById('keepLocalBtn').addEventListener('click', keepLocalData);
+document.getElementById('useCloudBtn').addEventListener('click', useCloudData);
+document.getElementById('deferConflictBtn').addEventListener('click', deferConflict);
 document.getElementById('openVersionBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   renderVersionInfo();

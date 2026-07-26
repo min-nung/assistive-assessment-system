@@ -1,7 +1,7 @@
 import { CLOUD_CONFIG } from './cloud-config.js';
 import { decideSync, SYNC_ACTIONS, SYNC_TRIGGERS, SYNC_DEBOUNCE_MS } from './sync-decision.js';
 import {
-  hasValidToken, fetchSnapshotModifiedTime, uploadSnapshot, DriveAuthError
+  hasValidToken, fetchSnapshotModifiedTime, fetchSnapshot, uploadSnapshot, DriveAuthError
 } from './drive-client.js';
 import { state, onStateChanged } from '../core/state.js';
 
@@ -248,25 +248,37 @@ function startCloudBackup(onChange) {
 }
 
 /**
- * Used by conflict resolution (ticket 06) once the user has picked a side.
+ * Used by conflict resolution once the user has picked a side. Call only
+ * after the caller's own action (an upload, or applying the cloud snapshot to
+ * local data) has actually happened — this function does not perform either
+ * one itself, only records that the mismatch is settled.
  *
  * Clearing the flag alone is not enough: decideSync detects conflict by
  * comparing cloudSnapshotAt against lastUploadedAt, and neither of those facts
- * changes just because the user made a choice. Without forceUpload, the very
- * next change would re-run the same comparison and re-enter conflict.
+ * changes just because the user made a choice. Without also reconciling
+ * lastUploadedAt, the very next change re-runs the same comparison and
+ * re-enters conflict — this bit the keepLocal:true path once already (fixed
+ * with forceUpload) and would otherwise bite keepLocal:false the same way:
+ * applying the cloud snapshot to local data never touches lastUploadedAt on
+ * its own, so a stale value left in place looks identical to a real conflict
+ * to the very next decideSync check.
  *
  * `keepLocal: true` means local data should overwrite the cloud on the next
  * attempt regardless of the timestamp mismatch that caused the conflict.
- * `keepLocal: false` means ticket 06 is about to replace local data with the
- * cloud copy — at that point local and cloud agree, so there is nothing left
- * to upload; forcing one here would overwrite the cloud copy with the data
- * that is about to be discarded.
+ * `keepLocal: false` means the caller already replaced local data with the
+ * cloud copy — local and cloud now agree, so lastUploadedAt is set to the
+ * cloud snapshot's own timestamp rather than left pointing at a moment before
+ * the resolution happened.
  *
  * @param {boolean} keepLocal Whether the user chose to keep local data
  */
 function resolveConflict(keepLocal) {
   hasUnresolvedConflict = false;
-  if (keepLocal) scheduleAttempt(SYNC_TRIGGERS.pageHidden, { forceUpload: true });
+  if (keepLocal) {
+    scheduleAttempt(SYNC_TRIGGERS.pageHidden, { forceUpload: true });
+  } else if (cloudSnapshotAt) {
+    writeTimestamp(CLOUD_CONFIG.lastUploadedAtKey, cloudSnapshotAt);
+  }
 }
 
 function currentUploadStatus() {
@@ -278,6 +290,52 @@ function currentUploadStatus() {
   });
 }
 
+/**
+ * When local data actually last changed, not when it was last uploaded. This
+ * is what a therapist means by "my data" when comparing devices — the tablet
+ * edit from this morning, whether or not it ever made it to Drive — so the
+ * conflict prompt compares real edit history rather than upload bookkeeping.
+ */
+function latestLocalChangeAt() {
+  const times = Object.values(state.cases)
+    .map(c => c.updatedAt)
+    .filter(t => typeof t === 'number' && Number.isFinite(t));
+  return times.length ? new Date(Math.max(...times)).toISOString() : null;
+}
+
+/**
+ * Fetches the cloud snapshot's own case count for the conflict prompt — the
+ * modifiedTime tracked elsewhere in this module says when Drive last wrote
+ * the file, not how many cases are in it.
+ *
+ * Unlike cloudSnapshotAt, which this module refreshes only at startup and
+ * right before an upload attempt to keep debounce ticks free of network
+ * calls, this fetches on every call. Nothing here runs on a timer — it only
+ * runs when a human opens the conflict dialog — so there is no equivalent
+ * debounce-tick cost to avoid, and showing the most current cloud state right
+ * before the user picks a side is worth the round trip.
+ *
+ * @returns {Promise<{localChangedAt: string|null, localCaseCount: number,
+ *   cloudSnapshotAt: string|null, cloudCaseCount: number}|null>} null if
+ *   there is no unresolved conflict, or the cloud fetch fails.
+ */
+async function describeConflict() {
+  if (!hasUnresolvedConflict) return null;
+  let cloudPayload;
+  try {
+    cloudPayload = await fetchSnapshot();
+  } catch (error) {
+    console.warn('無法取得雲端快照內容以顯示衝突詳情', error);
+    return null;
+  }
+  return Object.freeze({
+    localChangedAt: latestLocalChangeAt(),
+    localCaseCount: Object.keys(state.cases).length,
+    cloudSnapshotAt: cloudPayload?.exportedAt || cloudSnapshotAt,
+    cloudCaseCount: cloudPayload ? Object.keys(cloudPayload.cases || {}).length : 0
+  });
+}
+
 export {
-  startCloudBackup, resolveConflict, currentUploadStatus, UPLOAD_STATES
+  startCloudBackup, resolveConflict, currentUploadStatus, describeConflict, UPLOAD_STATES
 };

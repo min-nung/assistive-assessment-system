@@ -1,4 +1,4 @@
-const CACHE_NAME = 'assistive-assessment-modular-v11';
+const CACHE_NAME = 'assistive-assessment-modular-v12';
 const APP_SHELL = [
   './',
   './index.html',

@@ -5,8 +5,9 @@ import {
   requestAccess, renewAccessSilently, revokeAccess, fetchLinkedEmail,
   hasValidToken, forgetToken, DriveAuthError
 } from './drive-client.js';
-import { startCloudBackup, currentUploadStatus, UPLOAD_STATES } from './cloud-backup.js';
+import { startCloudBackup, resolveConflict, describeConflict, currentUploadStatus, UPLOAD_STATES } from './cloud-backup.js';
 import { previewCloudSnapshot, applyCloudSnapshot } from './restore.js';
+import { fetchSnapshot } from './drive-client.js';
 import { formatBackupDate } from '../backup/backup.js';
 import { showToast } from '../ui.js';
 
@@ -110,8 +111,14 @@ function renderCloudPanel() {
     const text = upload ? describeUploadStatus(upload) : null;
     uploadStatusEl.textContent = text || '';
     uploadStatusEl.hidden = !text;
+    // Clickable specifically in the conflict state, so "有待處理的衝突" is not
+    // just a label — it is the way back into the dialog that resolves it.
+    const isConflict = upload?.state === UPLOAD_STATES.conflict;
+    uploadStatusEl.classList.toggle('cloud-upload-status-actionable', isConflict);
+    uploadStatusEl.setAttribute('role', isConflict ? 'button' : '');
+    uploadStatusEl.tabIndex = isConflict ? 0 : -1;
     if (upload?.state === UPLOAD_STATES.failed) uploadStatusEl.dataset.tone = 'failed';
-    else if (upload?.state === UPLOAD_STATES.conflict) uploadStatusEl.dataset.tone = 'conflict';
+    else if (isConflict) uploadStatusEl.dataset.tone = 'conflict';
     else delete uploadStatusEl.dataset.tone;
   }
   linkBtn.hidden = !state.canLink;
@@ -182,6 +189,87 @@ function confirmCloudRestore() {
 function skipCloudRestore() {
   pendingRestore = null;
   document.getElementById('restoreDialog')?.close();
+}
+
+function describeSnapshotSide(changedAt, caseCount) {
+  return changedAt
+    ? `${formatBackupDate(changedAt)}，共 ${caseCount} 筆個案`
+    : `時間不明，共 ${caseCount} 筆個案`;
+}
+
+/**
+ * Opens the conflict dialog with both sides' time and case count, per the
+ * ticket's own requirement to show them side by side rather than asking the
+ * user to choose blind. Safe to call repeatedly — clicking the status line
+ * again while the dialog is open just re-renders it with fresh cloud data.
+ */
+async function openConflictDialog() {
+  const dialog = document.getElementById('conflictDialog');
+  const localEl = document.getElementById('conflictLocalDetail');
+  const cloudEl = document.getElementById('conflictCloudDetail');
+  if (!dialog?.showModal || !localEl || !cloudEl) return;
+  const conflict = await describeConflict().catch(error => {
+    console.warn('無法取得衝突詳情', error);
+    return null;
+  });
+  if (!conflict) return;
+  localEl.textContent = describeSnapshotSide(conflict.localChangedAt, conflict.localCaseCount);
+  cloudEl.textContent = describeSnapshotSide(conflict.cloudSnapshotAt, conflict.cloudCaseCount);
+  dialog.showModal();
+}
+
+/** Keep local data, overwriting the cloud snapshot on the next upload. */
+function keepLocalData() {
+  resolveConflict(true);
+  document.getElementById('conflictDialog')?.close();
+  renderCloudPanel();
+  showToast('已選擇保留本機資料，稍後會自動上傳覆蓋雲端');
+}
+
+/**
+ * Adopt the cloud snapshot. Reuses restore.js's fetch-validate-migrate-apply
+ * path — including its own pre-apply safety export — so a conflict resolution
+ * is held to the exact same untrusted-input discipline as a fresh restore,
+ * not a shortcut around it.
+ *
+ * Fetches again rather than reusing what openConflictDialog() already showed:
+ * this overwrites local data and cannot be undone, and the user may have sat
+ * on the dialog for a while before deciding, so applying a snapshot that is
+ * current at the moment of the decision is worth a second round trip.
+ */
+async function useCloudData() {
+  const useCloudBtn = document.getElementById('useCloudBtn');
+  if (useCloudBtn) useCloudBtn.disabled = true;
+  try {
+    const payload = await fetchSnapshot();
+    if (!payload) {
+      alert('無法取得雲端快照，請稍後再試。');
+      return;
+    }
+    const result = applyCloudSnapshot(payload);
+    if (!result.ok) {
+      alert(`無法採用雲端資料：${result.message}`);
+      return;
+    }
+    // Only clear the conflict once the cloud copy has actually replaced local
+    // data — a failed fetch or a bad snapshot must leave the conflict in
+    // place, or the next change would upload over data the user never saw.
+    resolveConflict(false);
+    document.getElementById('conflictDialog')?.close();
+    renderCloudPanel();
+  } catch (error) {
+    console.warn('採用雲端資料失敗', error);
+    alert('無法取得雲端快照，請稍後再試。');
+  } finally {
+    if (useCloudBtn) useCloudBtn.disabled = false;
+  }
+}
+
+/** "先不要決定" — the dialog closes, the app stays fully usable, and the
+ * conflict remains unresolved so auto-upload stays paused until the user
+ * comes back to choose. */
+function deferConflict() {
+  document.getElementById('conflictDialog')?.close();
 }
 
 // linkBtn.disabled alone is not a real lock — offerCloudRestoreIfNew() is not
@@ -260,5 +348,6 @@ function initCloudBackup() {
 export {
   renderCloudPanel, openCloudDialog, linkCloudAccount,
   unlinkCloudAccount, restoreCloudLink, currentLinkState, initCloudBackup,
-  confirmCloudRestore, skipCloudRestore
+  confirmCloudRestore, skipCloudRestore,
+  openConflictDialog, keepLocalData, useCloudData, deferConflict
 };
