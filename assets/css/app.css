@@ -314,6 +314,11 @@
   .backup-dialog::backdrop { background: rgba(17,24,39,0.5); }
   .backup-dialog .backup-panel { margin: 0; }
   .backup-dialog-close { width: 100%; margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink-soft); font-size: 13px; }
+  /* A deliberately quiet way into the manual JSON backup — cloud backup is
+     the primary path now, but the manual export must stay reachable and
+     visible, per the project's rule that cloud backup is an added layer of
+     insurance, never a replacement. */
+  .advanced-link { display: block; width: 100%; margin-top: 11px; padding: 4px; border: none; background: none; color: var(--muted); font-size: 12px; text-decoration: underline; }
   .settings-panel,
   .version-panel { padding: 16px; }
   .settings-menu { display: grid; gap: 8px; margin-top: 12px; }

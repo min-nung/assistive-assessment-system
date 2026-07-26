@@ -103,12 +103,15 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').showModal();
 });
 document.getElementById('closeSettingsDialogBtn').addEventListener('click', () => document.getElementById('settingsDialog').close());
-document.getElementById('openBackupBtn').addEventListener('click', () => {
-  document.getElementById('settingsDialog').close();
+function openManualBackupDialog() {
   const dialog = document.getElementById('backupDialog');
   renderBackupPanel();
   renderCloudSummary();
   dialog.showModal();
+}
+document.getElementById('openManualBackupBtn').addEventListener('click', () => {
+  document.getElementById('cloudDialog').close();
+  openManualBackupDialog();
 });
 document.getElementById('cloudSummaryLine').addEventListener('click', () => {
   document.getElementById('backupDialog').close();
