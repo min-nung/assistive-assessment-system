@@ -1,0 +1,10 @@
+{
+  "name": "assistive-assessment-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "輔具評估與補助試算系統。本檔案僅用於執行測試——本專案沒有相依套件，也沒有建置流程。",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\""
+  }
+}
