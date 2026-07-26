@@ -2,17 +2,24 @@
 
 這是由單檔版重構而成的靜態網頁應用程式，提供個案資料管理、評估表單、爬梯資格判定、補助試算與備份／還原功能。
 
+## 線上版本
+
+<https://min-nung.github.io/assistive-assessment-system/>
+
 ## 專案結構
 
 ```text
 .
-├── index_3.html                  # 應用程式入口（原生 ES module）
+├── index.html                    # 應用程式入口（原生 ES module）
 ├── sw.js                         # Service Worker：離線快取
+├── package.json                  # 僅用於執行測試，無相依套件
+├── tests/                        # node:test 測試
 └── assets/
     ├── css/app.css               # 樣式
     └── js/
         ├── core/                 # 狀態、DOM 工具、個案 CRUD
         ├── backup/               # 備份格式驗證與匯入／匯出
+        ├── cloud/                # 雲端備份決策（純函式）
         ├── calculations/         # 爬梯資格與補助金額計算
         ├── forms/                # 各評估表單
         ├── views/                # 個案列表畫面
@@ -28,7 +35,7 @@
 ### VS Code Live Server
 
 1. 安裝 VS Code 的 **Live Server** 擴充套件。
-2. 在本專案開啟 `index_3.html`。
+2. 在本專案開啟 `index.html`。
 3. 點右下角 **Go Live**，或右鍵選擇 **Open with Live Server**。
 
 ### 其他靜態伺服器
@@ -37,7 +44,15 @@
 npx --yes serve . -l 5500
 ```
 
-接著開啟 `http://localhost:5500/index_3.html`。
+接著開啟 `http://localhost:5500/`，不需附加檔名。
+
+## 測試
+
+```bash
+npm test
+```
+
+決策模組的測試使用 Node 內建的 `node:test`，本專案沒有相依套件，不需要 `npm install`。
 
 ## 設計重點
 

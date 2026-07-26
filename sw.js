@@ -1,6 +1,7 @@
-const CACHE_NAME = 'assistive-assessment-modular-v7';
+const CACHE_NAME = 'assistive-assessment-modular-v8';
 const APP_SHELL = [
-  './index_3.html',
+  './',
+  './index.html',
   './assets/css/app.css',
   './assets/js/core/state.js',
   './assets/js/core/dom.js',
@@ -54,7 +55,7 @@ self.addEventListener('fetch', event => {
     } catch (error) {
       const cached = await caches.match(request);
       if (cached) return cached;
-      if (request.mode === 'navigate') return caches.match('./index_3.html');
+      if (request.mode === 'navigate') return caches.match('./index.html');
       throw error;
     }
   })());
