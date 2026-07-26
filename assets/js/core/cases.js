@@ -16,6 +16,7 @@ import { renderList } from '../views/case-list.js';
 function createCase(name, assessmentDate) {
   const trimmed = (name || '').trim();
   if (!trimmed) { showToast('請輸入個案名稱'); return null; }
+  if (trimmed.length > 40) { showToast('個案名稱最多 40 個字'); return null; }
   // Name uniqueness check (case-sensitive exact match)
   for (const id in state.cases) {
     if (state.cases[id].name === trimmed) {
@@ -210,7 +211,7 @@ function removeStep(blockId, stepId) {
   if (!c) return;
   const b = c.blocks.find(x => x.id === blockId);
   if (!b || b.type !== 'stair') return;
-  if (b.steps.length <= 1) { showToast('至少需保留一階'); return; }
+  if (b.steps.length <= 2) { showToast('至少需保留兩階'); return; }
   b.steps = b.steps.filter(s => s.id !== stepId);
   touchCase(c.id);
   saveState();

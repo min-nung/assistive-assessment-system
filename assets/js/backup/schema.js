@@ -92,6 +92,7 @@ function validateCaseRecord(caseKey, item, path) {
   validateSafeId(item.id, `${path}.id`);
   if (item.id !== caseKey) schemaError(`${path}.id`, '必須和個案索引一致');
   if (typeof item.name !== 'string' || !item.name.trim()) schemaError(`${path}.name`, '缺少個案名稱');
+  if (item.name.trim().length > 40) schemaError(`${path}.name`, '個案名稱最多 40 個字');
   if (item.assessmentDate !== undefined && typeof item.assessmentDate !== 'string') {
     schemaError(`${path}.assessmentDate`, '必須是文字日期');
   }
