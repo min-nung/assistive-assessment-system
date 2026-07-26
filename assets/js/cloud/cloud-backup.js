@@ -229,7 +229,16 @@ async function checkForConflictAtStart() {
   }
 }
 
-/** Starts listening for changes and connectivity/visibility transitions. */
+/**
+ * Starts listening for changes and connectivity/visibility transitions.
+ *
+ * @returns {Promise<void>} Resolves once the startup conflict check has
+ *   settled. Nothing in this module awaits it internally — the check must
+ *   never delay showing the case list — but a caller deciding whether cloud
+ *   backup currently looks healthy (e.g. before showing the manual-export
+ *   reminder) needs the real answer, not whatever uploadState happened to be
+ *   before this async check finished.
+ */
 function startCloudBackup(onChange) {
   onUploadStateChanged = onChange || (() => {});
   onStateChanged(onLocalChange);
@@ -244,7 +253,7 @@ function startCloudBackup(onChange) {
     else setUploadState(mapDecisionState(decision.action));
   });
   window.addEventListener('offline', () => setUploadState(UPLOAD_STATES.offline));
-  checkForConflictAtStart();
+  return checkForConflictAtStart();
 }
 
 /**

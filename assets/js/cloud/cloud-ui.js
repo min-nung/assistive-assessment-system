@@ -19,22 +19,30 @@ import { showToast } from '../ui.js';
  *
  * This ticket covers authorization only — no snapshot is uploaded yet.
  */
-function readLinkedEmail() {
+function readTimestamp(key) {
   try {
-    return localStorage.getItem(CLOUD_CONFIG.linkedEmailKey);
+    return localStorage.getItem(key);
   } catch {
     // A browser with storage disabled must not break the assessment features.
     return null;
   }
 }
 
-function writeLinkedEmail(email) {
+function writeTimestamp(key, value, label = '無法保存雲端備份時間戳') {
   try {
-    if (email) localStorage.setItem(CLOUD_CONFIG.linkedEmailKey, email);
-    else localStorage.removeItem(CLOUD_CONFIG.linkedEmailKey);
+    if (value) localStorage.setItem(key, value);
+    else localStorage.removeItem(key);
   } catch (error) {
-    console.warn('無法保存雲端連結狀態', error);
+    console.warn(label, error);
   }
+}
+
+function readLinkedEmail() {
+  return readTimestamp(CLOUD_CONFIG.linkedEmailKey);
+}
+
+function writeLinkedEmail(email) {
+  writeTimestamp(CLOUD_CONFIG.linkedEmailKey, email, '無法保存雲端連結狀態');
 }
 
 function currentLinkState() {
@@ -86,6 +94,114 @@ function describeUploadStatus(status) {
   }
 }
 
+/**
+ * One line for the manual-backup panel, so a therapist checking on their data
+ * sees both backup paths in the same place rather than having to separately
+ * open the cloud dialog to find out if cloud backup is even working. Reuses
+ * currentLinkState()/describeUploadStatus() rather than re-deriving the
+ * distinctions — the five states the ticket requires (正常/離線/失敗/需重新
+ * 連結/衝突) are exactly the states those two functions already draw.
+ */
+function summarizeCloudStatus() {
+  const link = currentLinkState();
+  if (link.status === LINK_STATES.unlinked) {
+    return { label: '雲端備份：未連結', tone: 'muted' };
+  }
+  if (link.status === LINK_STATES.needsRelink) {
+    return { label: '雲端備份：需要重新連結', tone: 'failed' };
+  }
+  if (link.status === LINK_STATES.linkedOffline) {
+    return { label: '雲端備份：離線，待恢復連線後上傳', tone: 'muted' };
+  }
+  const upload = currentUploadStatus();
+  if (upload.state === UPLOAD_STATES.conflict) {
+    return { label: '雲端備份：有待處理的衝突', tone: 'conflict' };
+  }
+  if (upload.state === UPLOAD_STATES.failed) {
+    return { label: '雲端備份：上傳失敗', tone: 'failed' };
+  }
+  // A token can be valid at the moment currentLinkState() is read and still
+  // fail moments later mid-upload (drive-client.js's driveFetch calls
+  // forgetToken() on a 401/403, which currentLinkState() has not yet seen).
+  // Without this check that combination would fall through to the "ok"
+  // branch below and claim protection that just failed — the exact silent
+  // failure this ticket exists to prevent.
+  if (upload.state === UPLOAD_STATES.needsAuth) {
+    return { label: '雲端備份：授權已過期，備份已停止', tone: 'failed' };
+  }
+  const uploadedAt = formatUploadTime(upload.lastUploadedAt);
+  return { label: uploadedAt ? `雲端備份：${uploadedAt.replace('雲端：', '')}` : '雲端備份：已連結', tone: 'ok' };
+}
+
+/**
+ * Renders the cloud summary line inside the manual-backup panel. Lives here
+ * rather than in backup.js so backup.js stays cloud-agnostic — cloud-ui.js
+ * already imports from backup.js for formatBackupDate(), and importing back
+ * would make the two modules depend on each other in both directions.
+ */
+function renderCloudSummary() {
+  const line = document.getElementById('cloudSummaryLine');
+  if (!line) return;
+  const summary = summarizeCloudStatus();
+  line.textContent = `${summary.label}  ›`;
+  line.dataset.tone = summary.tone;
+}
+
+/**
+ * Whether cloud backup can currently be trusted to be doing its job. This is
+ * deliberately narrower than "linked" — a link with an expired token or a
+ * pending conflict is not backing anything up right now, and telling the
+ * therapist otherwise is exactly the silent-failure mode this ticket exists
+ * to prevent. Used to decide whether the 7-day manual reminder still applies.
+ */
+function isCloudBackupHealthy() {
+  const link = currentLinkState();
+  if (link.status !== LINK_STATES.linked) return false;
+  const uploadState = currentUploadStatus().state;
+  // needsAuth included here for the same reason summarizeCloudStatus() checks
+  // it explicitly: a token can be valid at the moment currentLinkState() is
+  // read and fail moments later mid-upload.
+  return uploadState !== UPLOAD_STATES.conflict
+    && uploadState !== UPLOAD_STATES.failed
+    && uploadState !== UPLOAD_STATES.needsAuth;
+}
+
+/**
+ * Days since the last successful cloud upload, or null if cloud backup was
+ * never linked at all — a user who never opted in gets the plain manual
+ * reminder, not a cloud-specific one about a feature they never turned on.
+ */
+function daysSinceLastCloudUpload() {
+  if (!readLinkedEmail()) return null;
+  const lastUploadedAt = currentUploadStatus().lastUploadedAt;
+  if (!lastUploadedAt) return Infinity;
+  const time = new Date(lastUploadedAt).getTime();
+  if (Number.isNaN(time)) return Infinity;
+  return (Date.now() - time) / (24 * 60 * 60 * 1000);
+}
+
+/**
+ * Active nudge for the failure mode this whole ticket exists to prevent: a
+ * therapist who trusts cloud backup, stops exporting JSON by hand, and has
+ * no way to notice it quietly stopped working weeks ago. Only fires for
+ * someone who actually linked — a user who never opted into cloud backup
+ * already gets the plain manual reminder from backup.js and needs nothing
+ * cloud-specific added on top.
+ *
+ * A toast, never a modal: this is a "you may want to check" nudge, not a
+ * decision the therapist must make before continuing, and nothing here may
+ * interrupt an assessment in progress.
+ */
+function remindCloudBackupIfStale() {
+  const days = daysSinceLastCloudUpload();
+  if (days === null || days < CLOUD_CONFIG.staleReminderDays) return;
+  const lastReminderAt = readTimestamp(CLOUD_CONFIG.staleReminderKey);
+  const reminderAge = lastReminderAt ? Date.now() - new Date(lastReminderAt).getTime() : Infinity;
+  if (reminderAge < CLOUD_CONFIG.staleReminderDays * 24 * 60 * 60 * 1000) return;
+  writeTimestamp(CLOUD_CONFIG.staleReminderKey, new Date().toISOString());
+  showToast('雲端備份已超過 7 天沒有成功上傳，建議檢查連結狀態或改用手動匯出');
+}
+
 function renderCloudPanel() {
   const status = document.getElementById('cloudStatus');
   const detail = document.getElementById('cloudDetail');
@@ -124,6 +240,11 @@ function renderCloudPanel() {
   linkBtn.hidden = !state.canLink;
   linkBtn.textContent = state.status === LINK_STATES.needsRelink ? '重新連結' : '連結 Google 帳號';
   unlinkBtn.hidden = !state.canUnlink;
+  // Every caller of renderCloudPanel() (link, unlink, restore, conflict
+  // resolution, silent renewal) should also keep the manual-backup panel's
+  // summary line current, so status updates never depend on remembering to
+  // call two functions at each site.
+  renderCloudSummary();
 }
 
 function openCloudDialog() {
@@ -341,13 +462,23 @@ async function restoreCloudLink() {
  * without the user having to reopen the dialog. Cheap to call repeatedly:
  * rendering only touches the DOM when the dialog's elements exist.
  */
+/**
+ * @returns {Promise<void>} See startCloudBackup()'s own return — resolves
+ *   once the startup conflict check has settled, for callers that need to
+ *   know whether cloud backup looks healthy right now rather than racing it.
+ */
 function initCloudBackup() {
-  startCloudBackup(renderCloudPanel);
+  // renderCloudPanel() also refreshes the summary line (see its own
+  // comment), so every upload-state change reaches both panels regardless
+  // of which one, if either, is currently open.
+  return startCloudBackup(renderCloudPanel);
 }
 
 export {
   renderCloudPanel, openCloudDialog, linkCloudAccount,
   unlinkCloudAccount, restoreCloudLink, currentLinkState, initCloudBackup,
   confirmCloudRestore, skipCloudRestore,
-  openConflictDialog, keepLocalData, useCloudData, deferConflict
+  openConflictDialog, keepLocalData, useCloudData, deferConflict,
+  summarizeCloudStatus, isCloudBackupHealthy, daysSinceLastCloudUpload, renderCloudSummary,
+  remindCloudBackupIfStale
 };

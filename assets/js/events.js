@@ -34,7 +34,8 @@ import { showToast, showSaved } from './ui.js';
 import { renderVersionInfo } from './version.js';
 import {
   openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink,
-  confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict
+  confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict,
+  renderCloudSummary
 } from './cloud/cloud-ui.js';
 
 /* DOM event bindings
@@ -106,7 +107,12 @@ document.getElementById('openBackupBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   const dialog = document.getElementById('backupDialog');
   renderBackupPanel();
+  renderCloudSummary();
   dialog.showModal();
+});
+document.getElementById('cloudSummaryLine').addEventListener('click', () => {
+  document.getElementById('backupDialog').close();
+  openCloudDialog();
 });
 document.getElementById('openCloudBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();

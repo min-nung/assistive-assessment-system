@@ -26,7 +26,14 @@ const CLOUD_CONFIG = Object.freeze({
   /* localStorage keys. The prefix matches the existing keys in core/state.js. */
   linkedEmailKey: 'stairAssessmentCloudLinkedEmail.v1',
   lastUploadedAtKey: 'stairAssessmentCloudLastUploadedAt.v1',
-  lastChangedAtKey: 'stairAssessmentCloudLastChangedAt.v1'
+  lastChangedAtKey: 'stairAssessmentCloudLastChangedAt.v1',
+  staleReminderKey: 'stairAssessmentCloudStaleReminderAt.v1',
+
+  /* Matches core/state.js's BACKUP_REMINDER_DAYS: Google's own test-mode
+   * token lifetime is about 7 days, so this is the same window a therapist
+   * would otherwise go silently unprotected for if cloud backup quietly
+   * stopped and nothing said so. */
+  staleReminderDays: 7
 });
 
 export { CLOUD_CONFIG };

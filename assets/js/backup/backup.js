@@ -87,7 +87,20 @@ function importBackupFile(file) {
   reader.readAsText(file, 'utf-8');
 }
 
-function remindBackupIfNeeded() {
+/**
+ * The 7-day manual reminder, skipped when cloud backup is already doing the
+ * job — two reminder systems nagging about the same underlying risk would
+ * teach the therapist to dismiss both. backup.js has no knowledge of cloud
+ * backup itself (avoiding a dependency back onto cloud/, which already
+ * imports from this file); the caller passes in whether cloud backup is
+ * currently healthy.
+ *
+ * @param {boolean} [isCloudBackupHealthy] Skip the manual reminder when true.
+ *   Defaults to false so a caller that never checks — including anyone still
+ *   calling this the old way — keeps the exact prior behavior.
+ */
+function remindBackupIfNeeded(isCloudBackupHealthy = false) {
+  if (isCloudBackupHealthy) return;
   if (!Object.keys(state.cases).length || !getBackupStatus().due) return;
   const lastReminderAt = localStorage.getItem(BACKUP_REMINDER_KEY);
   const reminderAge = lastReminderAt ? Date.now() - new Date(lastReminderAt).getTime() : Infinity;
