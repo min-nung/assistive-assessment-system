@@ -209,6 +209,17 @@
     <button type="button" class="backup-dialog-close" id="closeCloudDialogBtn">關閉</button>
   </div>
 </dialog>
+<dialog class="backup-dialog" id="restoreDialog" aria-labelledby="restoreDialogTitle">
+  <div class="backup-panel">
+    <div class="backup-panel-title" id="restoreDialogTitle">從雲端還原</div>
+    <div class="backup-panel-status" id="restoreDetail"></div>
+    <div class="backup-panel-status" id="restoreWarning" style="color:#b45309;"></div>
+    <div class="backup-actions">
+      <button type="button" class="backup-export" id="confirmRestoreBtn">確認還原</button>
+      <button type="button" id="skipRestoreBtn">先不要</button>
+    </div>
+  </div>
+</dialog>
 <dialog class="backup-dialog version-dialog" id="versionDialog" aria-labelledby="versionDialogTitle">
   <div class="version-panel">
     <div class="backup-panel-title" id="versionDialogTitle">目前版本</div>

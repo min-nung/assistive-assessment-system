@@ -33,7 +33,8 @@ import {
 import { showToast, showSaved } from './ui.js';
 import { renderVersionInfo } from './version.js';
 import {
-  openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink
+  openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink,
+  confirmCloudRestore, skipCloudRestore
 } from './cloud/cloud-ui.js';
 
 /* DOM event bindings
@@ -114,6 +115,8 @@ document.getElementById('openCloudBtn').addEventListener('click', () => {
 document.getElementById('closeCloudDialogBtn').addEventListener('click', () => document.getElementById('cloudDialog').close());
 document.getElementById('linkCloudBtn').addEventListener('click', linkCloudAccount);
 document.getElementById('unlinkCloudBtn').addEventListener('click', unlinkCloudAccount);
+document.getElementById('confirmRestoreBtn').addEventListener('click', confirmCloudRestore);
+document.getElementById('skipRestoreBtn').addEventListener('click', skipCloudRestore);
 document.getElementById('openVersionBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   renderVersionInfo();

@@ -1,3 +1,4 @@
+import { state } from '../core/state.js';
 import { CLOUD_CONFIG } from './cloud-config.js';
 import { describeLinkState, LINK_STATES } from './auth-state.js';
 import {
@@ -5,6 +6,8 @@ import {
   hasValidToken, forgetToken, DriveAuthError
 } from './drive-client.js';
 import { startCloudBackup, currentUploadStatus, UPLOAD_STATES } from './cloud-backup.js';
+import { previewCloudSnapshot, applyCloudSnapshot } from './restore.js';
+import { formatBackupDate } from '../backup/backup.js';
 import { showToast } from '../ui.js';
 
 /* Cloud backup panel.
@@ -122,7 +125,75 @@ function openCloudDialog() {
   if (dialog?.showModal) dialog.showModal();
 }
 
+/* Holds the snapshot between "here is what the cloud has" and "apply it",
+ * so confirming the restore dialog does not need to fetch a second time. */
+let pendingRestore = null;
+
+/**
+ * Offers a restore only right after an interactive link — not on every
+ * silent renewal at app start, which would re-prompt on every boot until the
+ * user acts. Skipped when local already has cases: an existing case list is
+ * real work, and pointing that user at a restore invites them to overwrite it.
+ */
+async function offerCloudRestoreIfNew() {
+  if (Object.keys(state.cases).length > 0) return;
+  let preview;
+  try {
+    preview = await previewCloudSnapshot();
+  } catch (error) {
+    console.warn('檢查雲端快照失敗', error);
+    return;
+  }
+  if (!preview) return;
+  pendingRestore = preview.payload;
+  const detail = document.getElementById('restoreDetail');
+  const warning = document.getElementById('restoreWarning');
+  const dialog = document.getElementById('restoreDialog');
+  if (!detail || !dialog?.showModal) return;
+  detail.textContent = `雲端備份時間：${formatBackupDate(preview.snapshotAt)}，共 ${preview.caseCount} 筆個案`;
+  if (warning) {
+    // The safety export is only real when there is something to export — do
+    // not promise a download that applyCloudSnapshot() will silently skip.
+    // The "will be replaced" line only applies once local data actually
+    // exists here (a future conflict-resolution path can also open this
+    // dialog with local cases present); the empty case still needs a plain
+    // statement so the user knows this is safe either way.
+    const hasLocalCases = Object.keys(state.cases).length > 0;
+    warning.textContent = hasLocalCases
+      ? '確認還原將以雲端資料取代本機現有資料，還原前會自動匯出目前的資料作為保險。'
+      : '目前沒有本機資料會被取代。';
+  }
+  dialog.showModal();
+}
+
+function confirmCloudRestore() {
+  const payload = pendingRestore;
+  pendingRestore = null;
+  document.getElementById('restoreDialog')?.close();
+  if (!payload) return;
+  const result = applyCloudSnapshot(payload);
+  if (!result.ok) {
+    // A bad snapshot must not look like it went through, and must not touch
+    // local data — applyCloudSnapshot() already guarantees the latter.
+    alert(`無法還原雲端備份：${result.message}`);
+  }
+}
+
+function skipCloudRestore() {
+  pendingRestore = null;
+  document.getElementById('restoreDialog')?.close();
+}
+
+// linkBtn.disabled alone is not a real lock — offerCloudRestoreIfNew() is not
+// awaited below, so the button re-enables before its fetch resolves. Without
+// this guard a fast double-click could start a second link attempt whose
+// restore preview resolves out of order and overwrites pendingRestore with a
+// stale snapshot the user never saw described.
+let linkInFlight = false;
+
 async function linkCloudAccount() {
+  if (linkInFlight) return;
+  linkInFlight = true;
   const linkBtn = document.getElementById('linkCloudBtn');
   if (linkBtn) linkBtn.disabled = true;
   try {
@@ -131,6 +202,7 @@ async function linkCloudAccount() {
     writeLinkedEmail(email);
     renderCloudPanel();
     showToast(email ? `已連結 ${email}` : '已連結 Google 帳號');
+    await offerCloudRestoreIfNew().catch(error => console.warn('雲端還原提示失敗', error));
   } catch (error) {
     // Failing to link must leave no impression that backup is active.
     forgetToken();
@@ -139,6 +211,7 @@ async function linkCloudAccount() {
     showToast(message);
     console.warn('連結 Google 帳號失敗', error);
   } finally {
+    linkInFlight = false;
     if (linkBtn) linkBtn.disabled = false;
   }
 }
@@ -186,5 +259,6 @@ function initCloudBackup() {
 
 export {
   renderCloudPanel, openCloudDialog, linkCloudAccount,
-  unlinkCloudAccount, restoreCloudLink, currentLinkState, initCloudBackup
+  unlinkCloudAccount, restoreCloudLink, currentLinkState, initCloudBackup,
+  confirmCloudRestore, skipCloudRestore
 };
