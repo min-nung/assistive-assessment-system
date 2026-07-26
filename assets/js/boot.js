@@ -1,7 +1,7 @@
 import { loadState, runBackFn } from './core/state.js';
 import { showList } from './navigation.js';
 import { remindBackupIfNeeded } from './backup/backup.js';
-import { restoreCloudLink } from './cloud/cloud-ui.js';
+import { restoreCloudLink, initCloudBackup } from './cloud/cloud-ui.js';
 import './events.js';
 
 /* Application bootstrap and service-worker integration
@@ -14,10 +14,15 @@ loadState();
 showList();
 setTimeout(remindBackupIfNeeded, 700);
 
-// Silent renewal of the cloud link. Deliberately not awaited and deliberately
-// swallowing errors: an expired authorization must never block or interrupt an
-// assessment in progress, so a failure only changes the status text.
-restoreCloudLink().catch(error => console.warn('雲端備份續期失敗', error));
+// Silent renewal of the cloud link, then start the upload coordinator once
+// renewal has had its chance — starting first would let the coordinator's own
+// startup conflict check run against a token that has not been renewed yet.
+// Neither step is awaited by the caller and both swallow their own errors: an
+// expired authorization must never block or interrupt an assessment in
+// progress, so a failure only changes the status text.
+restoreCloudLink()
+  .catch(error => console.warn('雲端備份續期失敗', error))
+  .finally(initCloudBackup);
 
 // 每次開啟時檢查 Service Worker 更新；連線時會優先使用網站最新版。
 if ('serviceWorker' in navigator) {

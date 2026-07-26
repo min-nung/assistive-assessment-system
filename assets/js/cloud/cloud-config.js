@@ -23,8 +23,10 @@ const CLOUD_CONFIG = Object.freeze({
    * reachable. */
   gisUrl: 'https://accounts.google.com/gsi/client',
 
-  /* localStorage key. The prefix matches the existing keys in core/state.js. */
-  linkedEmailKey: 'stairAssessmentCloudLinkedEmail.v1'
+  /* localStorage keys. The prefix matches the existing keys in core/state.js. */
+  linkedEmailKey: 'stairAssessmentCloudLinkedEmail.v1',
+  lastUploadedAtKey: 'stairAssessmentCloudLastUploadedAt.v1',
+  lastChangedAtKey: 'stairAssessmentCloudLastChangedAt.v1'
 });
 
 export { CLOUD_CONFIG };

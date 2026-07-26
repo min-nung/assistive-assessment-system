@@ -1,4 +1,4 @@
-const CACHE_NAME = 'assistive-assessment-modular-v9';
+const CACHE_NAME = 'assistive-assessment-modular-v10';
 const APP_SHELL = [
   './',
   './index.html',
@@ -24,6 +24,7 @@ const APP_SHELL = [
   './assets/js/cloud/auth-state.js',
   './assets/js/cloud/sync-decision.js',
   './assets/js/cloud/drive-client.js',
+  './assets/js/cloud/cloud-backup.js',
   './assets/js/cloud/cloud-ui.js',
   './assets/js/ui.js',
   './assets/js/version.js',

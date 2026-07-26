@@ -189,6 +189,71 @@ async function fetchLinkedEmail() {
   return data.user?.emailAddress || null;
 }
 
+/* Drive keeps exactly one snapshot file. It is found by name rather than by a
+ * remembered file ID, because the ID would need its own persistence and its
+ * own recovery path for exactly the case that matters most here — the
+ * browser's storage was cleared and the app has nothing memorized. Name
+ * lookup needs no such fallback: it already is the fallback. */
+const SNAPSHOT_FILENAME = '輔具評估系統雲端快照.json';
+const SNAPSHOT_MIME_TYPE = 'application/json';
+const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+
+/**
+ * Find the snapshot file, trusting Drive's search rather than a cached ID.
+ * @returns {Promise<{id: string, modifiedTime: string}|null>} null when no
+ *   snapshot exists yet — a normal state for a first-time upload.
+ */
+async function findSnapshotFile() {
+  const query = encodeURIComponent(`name='${SNAPSHOT_FILENAME}' and trashed=false`);
+  const response = await driveFetch(
+    `${DRIVE_FILES_URL}?q=${query}&spaces=drive&fields=files(id,modifiedTime)&pageSize=1`
+  );
+  const data = await response.json();
+  return data.files?.[0] || null;
+}
+
+/** The snapshot's last-modified time, or null when none exists. */
+async function fetchSnapshotModifiedTime() {
+  const file = await findSnapshotFile();
+  return file?.modifiedTime || null;
+}
+
+async function fetchSnapshot() {
+  const file = await findSnapshotFile();
+  if (!file) return null;
+  const response = await driveFetch(`${DRIVE_FILES_URL}/${file.id}?alt=media`);
+  return response.json();
+}
+
+/**
+ * Create or update the single snapshot file. Multipart upload lets metadata
+ * (the filename) and content ride in one request; a plain media upload cannot
+ * set the name Drive shows the user.
+ */
+async function uploadSnapshot(payload) {
+  const existing = await findSnapshotFile();
+  const boundary = `snapshot-${Date.now()}`;
+  const metadata = existing ? {} : { name: SNAPSHOT_FILENAME };
+  const body =
+    `--${boundary}\r\n` +
+    `Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\n` +
+    `Content-Type: ${SNAPSHOT_MIME_TYPE}\r\n\r\n${JSON.stringify(payload)}\r\n` +
+    `--${boundary}--`;
+
+  const url = existing
+    ? `${DRIVE_UPLOAD_URL}/${existing.id}?uploadType=multipart`
+    : `${DRIVE_UPLOAD_URL}?uploadType=multipart`;
+  const response = await driveFetch(url, {
+    method: existing ? 'PATCH' : 'POST',
+    headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+    body
+  });
+  const file = await response.json();
+  return { id: file.id, modifiedTime: file.modifiedTime };
+}
+
 /**
  * Drop the local authorization. Deliberately does not delete the snapshot on
  * Drive — an accidental tap must not destroy the user's backup.
@@ -221,5 +286,6 @@ function revokeAccess() {
 export {
   requestAccess, renewAccessSilently, revokeAccess, fetchLinkedEmail,
   getAccessToken, hasValidToken, forgetToken, driveFetch,
-  DriveAuthError, AUTH_ERRORS
+  fetchSnapshotModifiedTime, fetchSnapshot, uploadSnapshot,
+  DriveAuthError, AUTH_ERRORS, SNAPSHOT_FILENAME
 };

@@ -328,8 +328,18 @@ function persistCases(cases) {
   }
 }
 
+// 變動通知：cloud/cloud-backup.js 訂閱這裡，得知「有東西變了」。這是雲端備份
+// 唯一的整合點——不需要修改任何表單模組，因為所有變動都經過 saveState()。
+const changeListeners = [];
+
+function onStateChanged(listener) {
+  changeListeners.push(listener);
+}
+
 function saveState() {
-  return persistCases(state.cases);
+  const ok = persistCases(state.cases);
+  if (ok) changeListeners.forEach(listener => listener());
+  return ok;
 }
 
 function uid() {
@@ -341,5 +351,5 @@ export {
   state, defaultBasicInfo, defaultWheelchair, defaultExemptDevices,
   defaultShower, SHOWER_ADDON_OPTIONS, showerComboKey, defaultWalker,
   defaultTransfer, defaultCushion, defaultAirbed, defaultHomeAccessibility, defaultSubsidyCalc,
-  migrateCases, loadState, persistCases, saveState, uid, setBackFn, runBackFn
+  migrateCases, loadState, persistCases, saveState, onStateChanged, uid, setBackFn, runBackFn
 };
