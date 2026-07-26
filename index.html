@@ -163,6 +163,14 @@
         </span>
         <span class="settings-menu-arrow" aria-hidden="true">›</span>
       </button>
+      <button type="button" class="settings-menu-item" id="openCloudBtn">
+        <span class="settings-menu-icon" aria-hidden="true">☁</span>
+        <span class="settings-menu-text">
+          <strong>雲端備份</strong>
+          <small>自動備份到你的 Google Drive</small>
+        </span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </button>
       <button type="button" class="settings-menu-item" id="openVersionBtn">
         <span class="settings-menu-icon" aria-hidden="true">ⓘ</span>
         <span class="settings-menu-text">
@@ -185,6 +193,19 @@
     </div>
     <input id="importBackupInput" type="file" accept="application/json,.json" hidden>
     <button type="button" class="backup-dialog-close" id="closeBackupDialogBtn">關閉</button>
+  </div>
+</dialog>
+<dialog class="backup-dialog" id="cloudDialog" aria-labelledby="cloudDialogTitle">
+  <div class="backup-panel">
+    <div class="backup-panel-title" id="cloudDialogTitle">雲端備份</div>
+    <div class="cloud-state" id="cloudStatus">未連結</div>
+    <div class="backup-panel-status" id="cloudDetail"></div>
+    <div class="cloud-account" id="cloudAccount" hidden></div>
+    <div class="backup-actions">
+      <button type="button" class="backup-export" id="linkCloudBtn">連結 Google 帳號</button>
+      <button type="button" id="unlinkCloudBtn" hidden>解除連結</button>
+    </div>
+    <button type="button" class="backup-dialog-close" id="closeCloudDialogBtn">關閉</button>
   </div>
 </dialog>
 <dialog class="backup-dialog version-dialog" id="versionDialog" aria-labelledby="versionDialogTitle">

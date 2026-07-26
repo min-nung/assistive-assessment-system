@@ -282,6 +282,13 @@
   .backup-panel-title { font-size: 14px; font-weight: 700; color: var(--ink-soft); }
   .backup-panel-status { font-size: 12px; color: var(--muted); margin-top: 4px; }
   .backup-panel.due .backup-panel-status { color: #b45309; }
+  /* Cloud backup state. Only the linked state reads as reassuring — the rest
+     must not look like the data is already protected. */
+  .cloud-state { font-size: 15px; font-weight: 700; margin-top: 7px; color: var(--muted); }
+  .cloud-state[data-state="linked"] { color: #047857; }
+  .cloud-state[data-state="linked-offline"] { color: #b45309; }
+  .cloud-state[data-state="needs-relink"] { color: #b91c1c; }
+  .cloud-account { font-size: 12px; color: var(--ink-soft); margin-top: 5px; word-break: break-all; }
   .backup-actions { display: flex; gap: 8px; margin-top: 11px; }
   .backup-actions button { flex: 1; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); font-size: 13px; font-weight: 600; }
   .backup-actions .backup-export { background: var(--brand); border-color: var(--brand); color: #fff; }

@@ -32,6 +32,9 @@ import {
 } from './forms/home-accessibility.js';
 import { showToast, showSaved } from './ui.js';
 import { renderVersionInfo } from './version.js';
+import {
+  openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink
+} from './cloud/cloud-ui.js';
 
 /* DOM event bindings
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.
@@ -104,6 +107,13 @@ document.getElementById('openBackupBtn').addEventListener('click', () => {
   renderBackupPanel();
   dialog.showModal();
 });
+document.getElementById('openCloudBtn').addEventListener('click', () => {
+  document.getElementById('settingsDialog').close();
+  openCloudDialog();
+});
+document.getElementById('closeCloudDialogBtn').addEventListener('click', () => document.getElementById('cloudDialog').close());
+document.getElementById('linkCloudBtn').addEventListener('click', linkCloudAccount);
+document.getElementById('unlinkCloudBtn').addEventListener('click', unlinkCloudAccount);
 document.getElementById('openVersionBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   renderVersionInfo();
@@ -123,6 +133,14 @@ document.getElementById('importBackupInput').addEventListener('change', e => {
   importBackupFile(file);
   e.target.value = '';
 });
+
+// Keep the cloud status text honest when connectivity changes. Coming back
+// online retries the renewal, so a link that is actually fine stops reading as
+// "needs relink"; going offline only needs a re-render.
+window.addEventListener('online', () => {
+  restoreCloudLink().catch(error => console.warn('恢復連線後續期失敗', error));
+});
+window.addEventListener('offline', renderCloudPanel);
 
 document.getElementById('caseList').addEventListener('click', e => {
   // 刪除個案
