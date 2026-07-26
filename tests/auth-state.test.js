@@ -54,9 +54,13 @@ test('已連結但離線時狀態為 linked-offline，而非 needs-relink', () =
   assert.equal(state.status, LINK_STATES.linkedOffline);
 });
 
-test('離線且 token 已失效時，仍回報需要重新連結', () => {
+// 離線時無從得知 token 是否真的失效——hasValidToken=false 在離線情境下唯一
+// 確定的訊息是「這台裝置這個 session 還沒拿到有效 token」，不代表授權過期。
+// 離線本身已經是一個確定、誠實的答案，優先於這個推測，避免使用者誤以為
+// 恢復連線也沒用、得先跑一趟重新授權。
+test('離線時即使 hasValidToken 為 false，仍回報 linked-offline 而非 needs-relink', () => {
   const state = describeLinkState(situation({ isOnline: false, hasValidToken: false }));
-  assert.equal(state.status, LINK_STATES.needsRelink);
+  assert.equal(state.status, LINK_STATES.linkedOffline);
 });
 
 test('未連結且離線時仍回報未連結，不誤報為離線問題', () => {
@@ -82,6 +86,54 @@ test('完全沒有情境資料時回報未連結而不拋出錯誤', () => {
 
 test('未提供任何參數時回報未連結而不拋出錯誤', () => {
   assert.equal(describeLinkState().status, LINK_STATES.unlinked);
+});
+
+/* ==========================================================================
+   延遲驗證：開機時不主動觸發 GIS 靜默續期（避免 iOS 每次詢問彈出視窗權限），
+   token 是否真的有效要等到第一次真正的操作才確認。這段等待期間必須誠實標示
+   「尚未確認」，不能冒充成真正驗證過的 linked。
+   ========================================================================== */
+
+test('已連結但尚未驗證 token 時狀態為 linked-unverified，而非 linked', () => {
+  const state = describeLinkState(situation({ isVerified: false }));
+  assert.equal(state.status, LINK_STATES.linkedUnverified);
+});
+
+test('未驗證狀態下即使 hasValidToken 為 false，也不直接判定為 needs-relink', () => {
+  // hasValidToken 在延遲驗證期間本來就是「還沒查過」，不是「查過且失效」，
+  // 兩者意義不同，不該把前者當後者處理而叫使用者白跑一趟重新連結。
+  const state = describeLinkState(situation({ isVerified: false, hasValidToken: false }));
+  assert.equal(state.status, LINK_STATES.linkedUnverified);
+});
+
+test('未驗證狀態不宣稱受保護——這是唯一容許顯示樂觀標籤但 isProtected 仍為 false 的狀態', () => {
+  const state = describeLinkState(situation({ isVerified: false }));
+  assert.equal(state.isProtected, false);
+});
+
+test('未驗證狀態下仍顯示帳號，讓使用者知道連結的是哪一個', () => {
+  const state = describeLinkState(situation({ isVerified: false, linkedEmail: 'someone@example.com' }));
+  assert.equal(state.email, 'someone@example.com');
+});
+
+test('未連結時，即使 isVerified 為 false，仍回報 unlinked——沒有帳號就沒有可等待驗證的連結', () => {
+  const state = describeLinkState(situation({ isVerified: false, linkedEmail: null, hasValidToken: false }));
+  assert.equal(state.status, LINK_STATES.unlinked);
+});
+
+test('未提供 isVerified 時預設視為已驗證，維持既有呼叫端行為不變', () => {
+  const state = describeLinkState(situation());
+  assert.equal(state.status, LINK_STATES.linked);
+});
+
+test('未驗證狀態可以解除連結', () => {
+  const state = describeLinkState(situation({ isVerified: false }));
+  assert.equal(state.canUnlink, true);
+});
+
+test('未驗證狀態不提示需要重新連結（canLink 為 false），因為還不知道是否真的需要', () => {
+  const state = describeLinkState(situation({ isVerified: false }));
+  assert.equal(state.canLink, false);
 });
 
 /* ==========================================================================

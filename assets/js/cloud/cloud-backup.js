@@ -39,6 +39,12 @@ let retryTimer = null;
 let retryCount = 0;
 let uploadInFlight = null;
 let onUploadStateChanged = () => {};
+/* True once the app-start conflict gate has actually run against a verified
+ * token. startCloudBackup() no longer guarantees this happens at launch —
+ * cloud-ui.js now defers GIS verification until a real user gesture needs it
+ * — so this lets checkForConflictNow() run the same check again, once, the
+ * first time verification actually happens instead of at page load. */
+let startupConflictChecked = false;
 
 function setUploadState(next, error = null) {
   uploadState = next;
@@ -211,9 +217,18 @@ function flushPendingChanges() {
   if (decision.action === SYNC_ACTIONS.upload) scheduleAttempt(SYNC_TRIGGERS.pageHidden);
 }
 
-/** Checked once at startup, per the spec's two-gate conflict rule. */
+/**
+ * Checked once, per the spec's two-gate conflict rule. Named "at start" for
+ * what it checks (the first look at cloud state this session), not when it
+ * runs — it does nothing until hasValidToken() is actually true, which now
+ * depends on cloud-ui.js's deferred verification rather than always being
+ * true by the time this first runs at launch. checkForConflictNow() is what
+ * actually re-invokes this once verification happens later.
+ */
 async function checkForConflictAtStart() {
+  if (startupConflictChecked) return;
   if (!readLinkedEmail() || !hasValidToken()) return;
+  startupConflictChecked = true;
   try {
     cloudSnapshotAt = await fetchSnapshotModifiedTime();
   } catch (error) {
@@ -227,6 +242,20 @@ async function checkForConflictAtStart() {
   } else if (decision.action === SYNC_ACTIONS.upload) {
     scheduleAttempt();
   }
+}
+
+/**
+ * Called by cloud-ui.js right after GIS verification actually succeeds,
+ * whenever that ends up happening — at launch if a token was already valid
+ * in memory (rare, since page loads start with none), or later once the user
+ * opens settings or the cloud dialog. A no-op after the first successful run
+ * (startupConflictChecked), so this is safe to call from every verification
+ * path without double-triggering the conflict check.
+ *
+ * @returns {Promise<void>}
+ */
+function checkForConflictNow() {
+  return checkForConflictAtStart();
 }
 
 /**
@@ -346,5 +375,5 @@ async function describeConflict() {
 }
 
 export {
-  startCloudBackup, resolveConflict, currentUploadStatus, describeConflict, UPLOAD_STATES
+  startCloudBackup, checkForConflictNow, resolveConflict, currentUploadStatus, describeConflict, UPLOAD_STATES
 };

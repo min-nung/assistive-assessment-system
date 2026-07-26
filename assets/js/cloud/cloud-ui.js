@@ -5,7 +5,9 @@ import {
   requestAccess, renewAccessSilently, revokeAccess, fetchLinkedEmail,
   hasValidToken, forgetToken, DriveAuthError
 } from './drive-client.js';
-import { startCloudBackup, resolveConflict, describeConflict, currentUploadStatus, UPLOAD_STATES } from './cloud-backup.js';
+import {
+  startCloudBackup, checkForConflictNow, resolveConflict, describeConflict, currentUploadStatus, UPLOAD_STATES
+} from './cloud-backup.js';
 import { previewCloudSnapshot, applyCloudSnapshot } from './restore.js';
 import { fetchSnapshot } from './drive-client.js';
 import { formatBackupDate } from '../backup/backup.js';
@@ -45,11 +47,27 @@ function writeLinkedEmail(email) {
   writeTimestamp(CLOUD_CONFIG.linkedEmailKey, email, '無法保存雲端連結狀態');
 }
 
+/* Whether this session has actually asked GIS about the token yet.
+ *
+ * GIS's silent-renewal call opens a hidden popup even with prompt:'none', and
+ * iOS Safari treats any popup not triggered by a user gesture as one it must
+ * ask the user about — so calling it unconditionally at app start meant every
+ * single launch interrupted the user with "do you want to allow pop-ups?",
+ * whether or not the token actually needed renewing. Deferring the check
+ * until a real action needs a token (an upload, opening the cloud dialog)
+ * means the popup only ever fires as a consequence of something the user
+ * just did, which iOS does not flag.
+ *
+ * In-memory only — a fresh page load has not verified anything yet either,
+ * so it correctly starts false again on every reload. */
+let sessionVerified = false;
+
 function currentLinkState() {
   return describeLinkState({
     linkedEmail: readLinkedEmail(),
     hasValidToken: hasValidToken(),
-    isOnline: navigator.onLine
+    isOnline: navigator.onLine,
+    isVerified: sessionVerified
   });
 }
 
@@ -251,6 +269,13 @@ function openCloudDialog() {
   renderCloudPanel();
   const dialog = document.getElementById('cloudDialog');
   if (dialog?.showModal) dialog.showModal();
+  // Opening this dialog is a direct result of the user's own click, so this
+  // is a safe place for GIS's silent-renewal popup to fire if it needs to —
+  // iOS does not flag popups that follow a user gesture. Not awaited: the
+  // dialog is already open and showing an honest unverified/offline state;
+  // renderCloudPanel() inside ensureCloudLinkVerified() updates it in place
+  // once the real answer comes back.
+  ensureCloudLinkVerified().catch(error => console.warn('雲端備份驗證失敗', error));
 }
 
 /* Holds the snapshot between "here is what the cloud has" and "apply it",
@@ -407,10 +432,22 @@ async function linkCloudAccount() {
   if (linkBtn) linkBtn.disabled = true;
   try {
     await requestAccess();
+    // An interactive authorization that just succeeded is the strongest
+    // verification there is — stronger than the silent renewal
+    // ensureCloudLinkVerified() would otherwise wait for. Without this, the
+    // panel would show linked-unverified ("正在確認授權狀態…") right after a
+    // successful link, which reads as a regression to the user who just
+    // watched the consent screen complete.
+    sessionVerified = true;
     const email = await fetchLinkedEmail();
     writeLinkedEmail(email);
     renderCloudPanel();
     showToast(email ? `已連結 ${email}` : '已連結 Google 帳號');
+    // The app-start conflict gate never ran for this link (there was nothing
+    // to verify a token against before now), so run it retroactively — same
+    // reasoning as ensureCloudLinkVerified() calling this after its own
+    // successful silent renewal.
+    checkForConflictNow().catch(error => console.warn('啟動衝突檢查失敗', error));
     await offerCloudRestoreIfNew().catch(error => console.warn('雲端還原提示失敗', error));
   } catch (error) {
     // Failing to link must leave no impression that backup is active.
@@ -429,6 +466,14 @@ function unlinkCloudAccount() {
   if (!confirm('確定要解除 Google 帳號連結嗎？\n\n雲端上已備份的快照不會被刪除，但之後的變動將不再自動備份。')) return;
   const revokedWithGoogle = revokeAccess();
   writeLinkedEmail(null);
+  // A verification confirmed THIS grant, which no longer exists. Without
+  // resetting this, re-linking within the same session would let
+  // ensureCloudLinkVerified()'s sessionVerified-already-true short circuit
+  // skip real verification (harmless, since linkCloudAccount() sets the flag
+  // itself on success) and skip retroactively re-running the app-start
+  // conflict gate for the new link (not harmless — that gate would then never
+  // run for this session at all).
+  sessionVerified = false;
   renderCloudPanel();
   // The local link is gone either way. Say so plainly when the grant may still
   // exist on Google's side, rather than implying a cleanup that did not happen.
@@ -438,23 +483,76 @@ function unlinkCloudAccount() {
 }
 
 /**
- * Silent renewal at app start. Never prompts and never blocks: an expired
- * authorization must not interrupt an assessment, so a failure here only
- * changes the status text the user sees when they next open the panel.
+ * App-start entry point. Deliberately does NOT touch GIS — see
+ * sessionVerified's own comment for why calling renewAccessSilently()
+ * unconditionally at launch was the wrong default. This only renders whatever
+ * the honest-but-unverified state looks like from what is already on disk, so
+ * the panel has something sensible to show immediately.
+ *
+ * Real verification happens lazily, the first time something actually needs a
+ * token — see ensureCloudLinkVerified().
  */
-async function restoreCloudLink() {
-  if (!readLinkedEmail()) return;
-  if (!navigator.onLine) { renderCloudPanel(); return; }
-  if (hasValidToken()) { renderCloudPanel(); return; }
-  try {
-    await renewAccessSilently();
-  } catch (error) {
-    // Drop any token rather than relying on it already being absent, so the
-    // panel cannot claim protection the renewal just failed to obtain.
-    forgetToken();
-    console.warn('雲端備份靜默續期失敗，狀態將顯示為需要重新連結', error);
-  }
+function restoreCloudLink() {
   renderCloudPanel();
+}
+
+/* Shared in-flight promise so concurrent callers (e.g. the coordinator's own
+ * upload attempt and a user opening the cloud dialog at the same moment) wait
+ * on the same GIS call instead of each firing their own — GIS's hidden popup
+ * happening twice in quick succession is exactly the kind of thing that would
+ * make iOS suspicious again. */
+let verifyInFlight = null;
+
+/**
+ * Confirms whether the recorded link is actually still valid, the first time
+ * something needs to know for real (an upload attempt, opening the cloud
+ * dialog, an interactive link). Never prompts and never blocks assessment
+ * work: a failure here only changes the status text, exactly as the old
+ * unconditional startup renewal did — the only thing that changed is when
+ * this runs, not what it does once it runs.
+ *
+ * @returns {Promise<void>}
+ */
+async function ensureCloudLinkVerified() {
+  if (sessionVerified) return;
+  if (verifyInFlight) return verifyInFlight;
+  verifyInFlight = (async () => {
+    const linkedEmail = readLinkedEmail();
+    // Unlinked needs no verification — describeLinkState() already resolves
+    // to "unlinked" on linkedEmail alone, regardless of isVerified.
+    if (!linkedEmail) { sessionVerified = true; renderCloudPanel(); return; }
+    // Offline is left unverified on purpose: auth-state.js's resolveStatus()
+    // checks isOnline before isVerified, so the panel already shows the
+    // honest linkedOffline state without needing sessionVerified set. Leaving
+    // it false means the next call to this function — once the device is
+    // back online, e.g. from events.js's 'online' listener — actually
+    // attempts the real renewal instead of short-circuiting on a flag set
+    // while offline and never revisited.
+    if (!navigator.onLine) return;
+    if (!hasValidToken()) {
+      try {
+        await renewAccessSilently();
+      } catch (error) {
+        // Drop any token rather than relying on it already being absent, so
+        // the panel cannot claim protection the renewal just failed to obtain.
+        forgetToken();
+        console.warn('雲端備份靜默續期失敗，狀態將顯示為需要重新連結', error);
+      }
+    }
+    sessionVerified = true;
+    renderCloudPanel();
+    // The app-start conflict gate (spec's first of two gates) was deferred
+    // along with verification itself — it needs a real token to compare
+    // against the cloud snapshot, which this call may have just obtained for
+    // the first time this session. checkForConflictNow() is a no-op if that
+    // gate already ran, so calling it unconditionally here is safe.
+    checkForConflictNow().catch(error => console.warn('啟動衝突檢查失敗', error));
+  })();
+  try {
+    await verifyInFlight;
+  } finally {
+    verifyInFlight = null;
+  }
 }
 
 /**
@@ -476,7 +574,7 @@ function initCloudBackup() {
 
 export {
   renderCloudPanel, openCloudDialog, linkCloudAccount,
-  unlinkCloudAccount, restoreCloudLink, currentLinkState, initCloudBackup,
+  unlinkCloudAccount, restoreCloudLink, ensureCloudLinkVerified, currentLinkState, initCloudBackup,
   confirmCloudRestore, skipCloudRestore,
   openConflictDialog, keepLocalData, useCloudData, deferConflict,
   summarizeCloudStatus, isCloudBackupHealthy, daysSinceLastCloudUpload, renderCloudSummary,

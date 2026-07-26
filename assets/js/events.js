@@ -33,7 +33,7 @@ import {
 import { showToast, showSaved } from './ui.js';
 import { renderVersionInfo } from './version.js';
 import {
-  openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, restoreCloudLink,
+  openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, ensureCloudLinkVerified,
   confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict,
   renderCloudSummary
 } from './cloud/cloud-ui.js';
@@ -101,6 +101,14 @@ document.getElementById('editCaseNameBtn').addEventListener('click', () => {
 });
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').showModal();
+  // Opening settings is a direct result of the user's own click — the safe
+  // place for GIS's silent-renewal popup to fire, if the link has not been
+  // verified yet this session. Not awaited: the menu is already open and
+  // usable; renderCloudPanel() inside this call updates the cloud status
+  // once the real answer comes back, and this is also what lets the 7-day
+  // manual reminder correctly suppress itself once cloud backup is confirmed
+  // healthy, rather than firing every 7 days regardless of real cloud state.
+  ensureCloudLinkVerified().catch(error => console.warn('雲端備份驗證失敗', error));
 });
 document.getElementById('closeSettingsDialogBtn').addEventListener('click', () => document.getElementById('settingsDialog').close());
 function openManualBackupDialog() {
@@ -161,12 +169,14 @@ document.getElementById('importBackupInput').addEventListener('change', e => {
   e.target.value = '';
 });
 
-// Keep the cloud status text honest when connectivity changes. Coming back
-// online retries the renewal, so a link that is actually fine stops reading as
-// "needs relink"; going offline only needs a re-render.
-window.addEventListener('online', () => {
-  restoreCloudLink().catch(error => console.warn('恢復連線後續期失敗', error));
-});
+// Keep the cloud status text honest when connectivity changes — a re-render
+// only, in both directions. Coming back online does not retry the GIS
+// renewal here: connectivity changes are not a user gesture, and firing the
+// silent-renewal popup off one would risk the same "allow pop-ups?" prompt
+// on iOS that deferring it from app start was meant to avoid. The real
+// verification happens the next time the user does something that needs it —
+// opening the cloud dialog, or an upload attempt failing with needs-auth.
+window.addEventListener('online', renderCloudPanel);
 window.addEventListener('offline', renderCloudPanel);
 
 document.getElementById('caseList').addEventListener('click', e => {
