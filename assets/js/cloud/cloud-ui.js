@@ -159,10 +159,30 @@ function summarizeCloudStatus() {
  */
 function renderCloudSummary() {
   const line = document.getElementById('cloudSummaryLine');
-  if (!line) return;
   const summary = summarizeCloudStatus();
-  line.textContent = `${summary.label}  ›`;
-  line.dataset.tone = summary.tone;
+  if (line) {
+    line.textContent = `${summary.label}  ›`;
+    line.dataset.tone = summary.tone;
+  }
+  renderCloudStatusBadge(summary);
+}
+
+/**
+ * Header badge so link status is visible from every screen, not just inside
+ * the manual-backup dialog. Hidden entirely when unlinked — a therapist who
+ * never opted in should not see a permanent reminder of a feature they chose
+ * not to use, matching daysSinceLastCloudUpload()'s same reasoning.
+ */
+function renderCloudStatusBadge(summary) {
+  const badge = document.getElementById('cloudStatusBadge');
+  if (!badge) return;
+  if (readLinkedEmail() === null) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = '';
+  badge.textContent = summary.label.replace('雲端備份：', '');
+  badge.dataset.tone = summary.tone;
 }
 
 /**

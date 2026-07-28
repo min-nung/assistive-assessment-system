@@ -109,6 +109,21 @@
     left: 0;
   }
   header.top .settings-btn { position: absolute; right: 0; font-size: 20px; line-height: 1; }
+  header.top .cloud-status-badge {
+    position: absolute;
+    right: 40px;
+    padding: 3px 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  header.top .cloud-status-badge[data-tone="ok"] { color: #047857; border-color: #a7f3d0; }
+  header.top .cloud-status-badge[data-tone="failed"] { color: #b91c1c; border-color: #fecaca; }
+  header.top .cloud-status-badge[data-tone="conflict"] { color: #b45309; border-color: #fde68a; }
   header.top .back-btn,
   header.top .action-btn {
     background: transparent;
@@ -1353,6 +1368,21 @@
   }
   header.top .back-btn:active,
   header.top .action-btn:active { background: rgba(0,0,0,0.15); }
+  header.top .cloud-status-badge {
+    position: absolute;
+    right: 40px;
+    padding: 3px 8px;
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    color: rgba(255,255,255,0.92);
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  header.top .cloud-status-badge[data-tone="ok"] { color: #a7f3d0; border-color: #a7f3d0; }
+  header.top .cloud-status-badge[data-tone="failed"] { color: #fecaca; border-color: #fecaca; }
+  header.top .cloud-status-badge[data-tone="conflict"] { color: #fde68a; border-color: #fde68a; }
 .subtitle { color: #7ec8e3; font-size: 14px; padding: 4px 0 0; letter-spacing: 0.2px; }
 
   /* ── Menu 卡片 ── */

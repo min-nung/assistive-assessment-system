@@ -125,6 +125,7 @@ document.getElementById('cloudSummaryLine').addEventListener('click', () => {
   document.getElementById('backupDialog').close();
   openCloudDialog();
 });
+document.getElementById('cloudStatusBadge').addEventListener('click', openCloudDialog);
 document.getElementById('openCloudBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   openCloudDialog();
