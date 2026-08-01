@@ -32,10 +32,30 @@ let accessToken = null;
 let tokenExpiresAt = 0;
 let gisLoading = null;
 
+/* Never report a token as usable this close to expiry, so an upload does not
+ * start with a credential that dies mid-request. */
+const TOKEN_EXPIRY_GUARD_MS = 60000;
+
+/**
+ * Whether a token exists and still has `marginMs` of life left.
+ *
+ * Callers renewing ahead of time pass a larger margin than callers about to
+ * make a single request: Google's access tokens last an hour, and an
+ * assessment session easily outlives one, so waiting for actual expiry would
+ * mean every long session hits a window where uploads simply fail. The guard
+ * below is a floor, never a ceiling — no caller may declare a token usable
+ * later than hasValidToken() would.
+ *
+ * @param {number} [marginMs] How much remaining life to require
+ * @returns {boolean}
+ */
+function hasFreshToken(marginMs = TOKEN_EXPIRY_GUARD_MS) {
+  const margin = Math.max(Number(marginMs) || 0, TOKEN_EXPIRY_GUARD_MS);
+  return Boolean(accessToken) && Date.now() < tokenExpiresAt - margin;
+}
+
 function hasValidToken() {
-  // Treat a token expiring within a minute as already gone, so an upload does
-  // not start with a credential that dies mid-request.
-  return Boolean(accessToken) && Date.now() < tokenExpiresAt - 60000;
+  return hasFreshToken(TOKEN_EXPIRY_GUARD_MS);
 }
 
 function getAccessToken() {
@@ -285,7 +305,7 @@ function revokeAccess() {
 
 export {
   requestAccess, renewAccessSilently, revokeAccess, fetchLinkedEmail,
-  getAccessToken, hasValidToken, forgetToken, driveFetch,
+  getAccessToken, hasValidToken, hasFreshToken, forgetToken, driveFetch,
   fetchSnapshotModifiedTime, fetchSnapshot, uploadSnapshot,
   DriveAuthError, AUTH_ERRORS, SNAPSHOT_FILENAME
 };

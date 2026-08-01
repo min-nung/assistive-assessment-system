@@ -3,7 +3,7 @@ import { CLOUD_CONFIG } from './cloud-config.js';
 import { describeLinkState, LINK_STATES } from './auth-state.js';
 import {
   requestAccess, renewAccessSilently, revokeAccess, fetchLinkedEmail,
-  hasValidToken, forgetToken, DriveAuthError
+  hasValidToken, hasFreshToken, forgetToken, DriveAuthError
 } from './drive-client.js';
 import {
   startCloudBackup, checkForConflictNow, resolveConflict, describeConflict, currentUploadStatus,
@@ -65,6 +65,39 @@ function writeLinkedEmail(email) {
  * In-memory only — a fresh page load has not verified anything yet either,
  * so it correctly starts false again on every reload. */
 let sessionVerified = false;
+
+/* Renew this long before the token actually expires.
+ *
+ * Google's access tokens last an hour and an assessment session easily
+ * outlives one. Waiting for real expiry would mean every long session has a
+ * window where uploads fail with no token and nothing to fix it — the same
+ * dead end this whole renewal path exists to close, just an hour later. A
+ * generous margin means renewal always happens during ordinary tapping,
+ * minutes before anything actually needs the token. */
+const TOKEN_RENEWAL_MARGIN_MS = 10 * 60 * 1000;
+
+/* Set when a silent renewal has actually failed, which in practice means the
+ * grant itself is gone (Google's test-mode authorizations expire after about a
+ * week) rather than anything a retry could fix. Without this, the gesture
+ * watcher below would fire a fresh GIS call on every single tap — turning one
+ * expired grant into a stream of popup attempts. Cleared only by something
+ * that genuinely changes the situation: an interactive re-link, an unlink, or
+ * coming back online after the failure happened on a flaky connection. */
+let silentRenewalFailed = false;
+
+/**
+ * Whether a silent renewal is worth attempting right now. Kept deliberately
+ * cheap: the gesture watcher calls this on every pointerdown, and the common
+ * answer — "no, the token is fine" — must cost nothing worth measuring.
+ *
+ * @returns {boolean}
+ */
+function needsTokenRenewal() {
+  if (silentRenewalFailed) return false;
+  if (!readLinkedEmail()) return false;
+  if (!navigator.onLine) return false;
+  return !hasFreshToken(TOKEN_RENEWAL_MARGIN_MS);
+}
 
 function currentLinkState() {
   return describeLinkState({
@@ -667,6 +700,11 @@ async function linkCloudAccount() {
     // successful link, which reads as a regression to the user who just
     // watched the consent screen complete.
     sessionVerified = true;
+    // A fresh grant is exactly the situation the backoff was waiting for.
+    // Without clearing it, the gesture watcher would stay switched off for the
+    // rest of the session and the very link the user just completed would not
+    // survive the next hour's token expiry.
+    silentRenewalFailed = false;
     const email = await fetchLinkedEmail();
     writeLinkedEmail(email);
     renderCloudPanel();
@@ -702,6 +740,8 @@ function unlinkCloudAccount() {
   // conflict gate for the new link (not harmless — that gate would then never
   // run for this session at all).
   sessionVerified = false;
+  // Same reasoning: the backoff describes a grant that no longer exists.
+  silentRenewalFailed = false;
   renderCloudPanel();
   // The local link is gone either way. Say so plainly when the grant may still
   // exist on Google's side, rather than implying a cleanup that did not happen.
@@ -732,17 +772,22 @@ function restoreCloudLink() {
 let verifyInFlight = null;
 
 /**
- * Confirms whether the recorded link is actually still valid, the first time
- * something needs to know for real (an upload attempt, opening the cloud
- * dialog, an interactive link). Never prompts and never blocks assessment
- * work: a failure here only changes the status text, exactly as the old
- * unconditional startup renewal did — the only thing that changed is when
- * this runs, not what it does once it runs.
+ * Confirms whether the recorded link is actually still valid, and renews the
+ * access token when it is missing or close to expiring. Called whenever
+ * something needs a token for real: the gesture watcher below, opening the
+ * cloud dialog, a view-only pull, an interactive link. Never prompts and never
+ * blocks assessment work — a failure here only changes the status text.
+ *
+ * The guard is token state, not sessionVerified alone. Verifying once per
+ * session was the original shape and it quietly capped cloud backup at a
+ * single hour: once the flag was set, nothing ever renewed again, so the
+ * moment Google's one-hour token expired every upload failed with no token
+ * and no path to getting one.
  *
  * @returns {Promise<void>}
  */
 async function ensureCloudLinkVerified() {
-  if (sessionVerified) return;
+  if (sessionVerified && !needsTokenRenewal()) return;
   if (verifyInFlight) return verifyInFlight;
   verifyInFlight = (async () => {
     const linkedEmail = readLinkedEmail();
@@ -757,14 +802,20 @@ async function ensureCloudLinkVerified() {
     // attempts the real renewal instead of short-circuiting on a flag set
     // while offline and never revisited.
     if (!navigator.onLine) return;
-    if (!hasValidToken()) {
+    // Renewed on the wider margin, not on hasValidToken(): a token with eight
+    // minutes left is still "valid" for the next request and still guarantees
+    // a dead end shortly afterwards.
+    if (!hasFreshToken(TOKEN_RENEWAL_MARGIN_MS)) {
       try {
         await renewAccessSilently();
+        silentRenewalFailed = false;
       } catch (error) {
         // Drop any token rather than relying on it already being absent, so
         // the panel cannot claim protection the renewal just failed to obtain.
         forgetToken();
+        silentRenewalFailed = true;
         console.warn('雲端備份靜默續期失敗，狀態將顯示為需要重新連結', error);
+        remindRelinkIfExpired();
       }
     }
     sessionVerified = true;
@@ -793,8 +844,89 @@ async function ensureCloudLinkVerified() {
  *   once the startup conflict check has settled, for callers that need to
  *   know whether cloud backup looks healthy right now rather than racing it.
  */
+/**
+ * Keeps a usable access token available for automatic backup, without ever
+ * asking the user to think about tokens.
+ *
+ * GIS obtains a token through a popup, even for a silent `prompt:'none'`
+ * renewal that shows nothing — and browsers, iOS Safari most strictly, only
+ * allow a popup that follows a real user gesture. That is why renewal cannot
+ * simply run on a timer or at launch: doing it at launch is what made every
+ * single app open ask "allow pop-ups?" on iPhone.
+ *
+ * So renewal rides along on the taps the therapist is making anyway. Any
+ * pointerdown or keydown will do — opening a case, touching a field, a finger
+ * landing to scroll. It does not have to be anything to do with backup, and
+ * nothing is shown. Because the token is checked on a ten-minute margin, this
+ * happens minutes before any upload actually needs it.
+ *
+ * Deliberately not a one-shot listener: the token expires every hour and the
+ * grant expires every week, so "already handled this session" is exactly the
+ * assumption that broke automatic backup in the first place. needsTokenRenewal()
+ * answers false almost every time, which is what keeps this cheap.
+ */
+function watchForTokenRenewalGesture() {
+  const renewOnGesture = () => {
+    if (!needsTokenRenewal()) return;
+    ensureCloudLinkVerified().catch(error => console.warn('雲端備份續期失敗', error));
+  };
+  document.addEventListener('pointerdown', renewOnGesture, { capture: true, passive: true });
+  document.addEventListener('keydown', renewOnGesture, { capture: true });
+  // A renewal that failed while the connection was flaky deserves another
+  // chance once the device is genuinely back online — otherwise a moment of
+  // bad reception would look identical to an expired grant and stay stuck
+  // until the user re-linked by hand for no reason.
+  window.addEventListener('online', () => { silentRenewalFailed = false; });
+}
+
+/* Shown at most once per session. Backup being stopped is worth interrupting
+ * for once; it is not worth interrupting for repeatedly, and the header badge
+ * keeps saying so afterwards for anyone who dismisses it. */
+let relinkPromptShown = false;
+
+/**
+ * Tells the user, in a dialog rather than a toast, that cloud backup has
+ * stopped and only they can restart it.
+ *
+ * This project's other cloud reminder is deliberately a toast, on the grounds
+ * that nothing may interrupt an assessment in progress. This one is different
+ * in kind: a stale-backup nudge is "you may want to check", while an expired
+ * grant is a decision only the user can make — no amount of waiting fixes it,
+ * and every minute until they do is unbacked work. A red badge in the header
+ * is too easy to work past for something that silently stops protecting data.
+ *
+ * Skipped while any other dialog is open: the cloud panel already says
+ * 需要重新連結 in that situation, and stacking a second window over what the
+ * user is currently reading helps nobody.
+ */
+function remindRelinkIfExpired() {
+  if (relinkPromptShown) return;
+  if (document.querySelector('dialog[open]')) return;
+  const dialog = document.getElementById('relinkDialog');
+  if (!dialog?.showModal) return;
+  const detail = document.getElementById('relinkDetail');
+  if (detail) {
+    detail.textContent = isReadOnlyDevice()
+      ? '雲端授權已到期，目前無法載入其他裝置的最新紀錄。重新連結後即可繼續檢視。'
+      : '雲端授權已到期，這台裝置的資料目前沒有在備份。重新連結後會立即補傳未上傳的變動。';
+  }
+  relinkPromptShown = true;
+  dialog.showModal();
+}
+
+/** Re-link from the expiry dialog. Runs the same interactive link as the panel. */
+function confirmRelink() {
+  document.getElementById('relinkDialog')?.close();
+  linkCloudAccount().catch(error => console.warn('重新連結失敗', error));
+}
+
+function dismissRelink() {
+  document.getElementById('relinkDialog')?.close();
+}
+
 function initCloudBackup() {
   onStateChanged(warnIfEditingViewOnlyDevice);
+  watchForTokenRenewalGesture();
   // renderCloudPanel() also refreshes the summary line (see its own
   // comment), so every upload-state change reaches both panels regardless
   // of which one, if either, is currently open.
@@ -824,5 +956,6 @@ export {
   confirmCloudRestore, skipCloudRestore,
   openConflictDialog, keepLocalData, useCloudData, deferConflict,
   summarizeCloudStatus, isCloudBackupHealthy, daysSinceLastCloudUpload, renderCloudSummary,
-  remindCloudBackupIfStale, setReadOnlyMode, pullCloudSnapshot, shouldSkipManualBackupReminder
+  remindCloudBackupIfStale, setReadOnlyMode, pullCloudSnapshot, shouldSkipManualBackupReminder,
+  confirmRelink, dismissRelink
 };

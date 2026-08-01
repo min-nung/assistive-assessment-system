@@ -35,7 +35,7 @@ import { renderVersionInfo } from './version.js';
 import {
   openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, ensureCloudLinkVerified,
   confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict,
-  renderCloudSummary, setReadOnlyMode, pullCloudSnapshot
+  renderCloudSummary, setReadOnlyMode, pullCloudSnapshot, confirmRelink, dismissRelink
 } from './cloud/cloud-ui.js';
 
 /* DOM event bindings
@@ -149,6 +149,8 @@ document.getElementById('cloudUploadStatus').addEventListener('keydown', e => {
   e.preventDefault();
   openConflictDialog();
 });
+document.getElementById('confirmRelinkBtn').addEventListener('click', confirmRelink);
+document.getElementById('dismissRelinkBtn').addEventListener('click', dismissRelink);
 document.getElementById('keepLocalBtn').addEventListener('click', keepLocalData);
 document.getElementById('useCloudBtn').addEventListener('click', useCloudData);
 document.getElementById('deferConflictBtn').addEventListener('click', deferConflict);

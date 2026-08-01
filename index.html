@@ -243,6 +243,17 @@
     <button type="button" class="backup-dialog-close" id="deferConflictBtn">先不要決定</button>
   </div>
 </dialog>
+<dialog class="backup-dialog" id="relinkDialog" aria-labelledby="relinkDialogTitle">
+  <div class="backup-panel">
+    <div class="backup-panel-title" id="relinkDialogTitle">雲端備份已停止</div>
+    <div class="backup-panel-status" id="relinkDetail"></div>
+    <div class="backup-panel-status" style="color:#b45309;">Google 的授權每隔一段時間就會到期，這是正常的，重新連結一次即可繼續自動備份。</div>
+    <div class="backup-actions">
+      <button type="button" id="dismissRelinkBtn">稍後再說</button>
+      <button type="button" class="backup-export" id="confirmRelinkBtn">重新連結</button>
+    </div>
+  </div>
+</dialog>
 <dialog class="backup-dialog version-dialog" id="versionDialog" aria-labelledby="versionDialogTitle">
   <div class="version-panel">
     <div class="backup-panel-title" id="versionDialogTitle">目前版本</div>
