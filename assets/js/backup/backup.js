@@ -2,6 +2,7 @@ import {
   state, BACKUP_DATE_KEY, BACKUP_REMINDER_KEY, BACKUP_REMINDER_DAYS,
   migrateCases, persistCases, readDeletedCases
 } from '../core/state.js';
+import { formatClockTime } from '../core/format-time.js';
 import { BACKUP_SCHEMA, validateBackupPayload } from './schema.js';
 import { renderList } from '../views/case-list.js';
 import { showToast } from '../ui.js';
@@ -9,15 +10,15 @@ import { showToast } from '../ui.js';
 /* Backup import, export, and reminder UI
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.
  */
-// 逐段組出 2026.08.01 16:01 而不交給 toLocaleString：zh-TW 會排出「2026/08/01
-// 下午04:01」，而備份時間是拿來跟記憶中「我大概幾點按下匯出」對照的，24 小時制
-// 少一次上午/下午的換算。取用的都是本機時區的欄位，跟使用者看到的時鐘一致。
+// 逐段組出 2026.08.01 下午 4:01 而不交給 toLocaleString：日期要的是點分隔與補
+// 零的固定寬度（幾份備份時間上下並排時對得齊），時刻則交給 formatClockTime()，
+// 跟個案清單、回收筒用同一支。取用的都是本機時區的欄位，跟使用者的時鐘一致。
 function formatBackupDate(timestamp) {
   const date = timestamp ? new Date(timestamp) : null;
   if (!date || Number.isNaN(date.getTime())) return '尚未備份';
   const pad = value => String(value).padStart(2, '0');
   return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())}`
-    + ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    + ` ${formatClockTime(date)}`;
 }
 
 function getBackupStatus() {

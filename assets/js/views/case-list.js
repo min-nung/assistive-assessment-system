@@ -1,5 +1,6 @@
 import { state } from '../core/state.js';
 import { escapeHtml, domIdToken } from '../core/dom.js';
+import { formatClockTime } from '../core/format-time.js';
 
 /* Case list rendering and shared escaping helpers
 + * Mechanically extracted from index_2.html. Keep public function names stable while modularizing.
@@ -96,7 +97,7 @@ function formatDate(ts) {
   const d = new Date(ts);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
-  if (sameDay) return `今天 ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  if (sameDay) return `今天 ${formatClockTime(d)}`;
   return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
 }
 

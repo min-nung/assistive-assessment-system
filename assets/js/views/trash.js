@@ -1,5 +1,6 @@
 import { state, TRASH_RETENTION_DAYS } from '../core/state.js';
 import { escapeHtml } from '../core/dom.js';
+import { formatClockTime } from '../core/format-time.js';
 import { daysLeftInTrash } from '../core/trash-retention.js';
 
 /* 回收筒畫面。
@@ -12,14 +13,14 @@ function trashCount() {
   return Object.keys(state.deletedCases).length;
 }
 
-/** 刪除時間顯示成「今天 14:30」或「8/1 14:30」，和個案列表同樣的體感。 */
+/** 刪除時間顯示成「今天 下午 2:30」或「8/1 下午 2:30」，和個案列表同樣的體感。 */
 function formatDeletedAt(deletedAt) {
   const time = new Date(deletedAt).getTime();
   if (Number.isNaN(time)) return '刪除時間不明';
   const d = new Date(time);
-  const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const clock = formatClockTime(d);
   const sameDay = d.toDateString() === new Date().toDateString();
-  return sameDay ? `今天 ${hhmm} 刪除` : `${d.getMonth() + 1}/${d.getDate()} ${hhmm} 刪除`;
+  return sameDay ? `今天 ${clock} 刪除` : `${d.getMonth() + 1}/${d.getDate()} ${clock} 刪除`;
 }
 
 /**
