@@ -4,6 +4,7 @@ import {
   hasValidToken, fetchSnapshotModifiedTime, fetchSnapshot, uploadSnapshot, DriveAuthError
 } from './drive-client.js';
 import { state, onStateChanged } from '../core/state.js';
+import { isReadOnlyDevice } from './read-only.js';
 
 /* Cloud backup coordinator.
  *
@@ -21,7 +22,8 @@ const UPLOAD_STATES = Object.freeze({
   offline: 'offline',
   conflict: 'conflict',
   needsAuth: 'needs-auth',
-  failed: 'failed'
+  failed: 'failed',
+  readOnly: 'read-only'
 });
 
 const MAX_RETRIES = 5;
@@ -91,6 +93,7 @@ function currentSituation(trigger) {
     msSinceLastChange: changedTime === null ? 0 : Date.now() - changedTime,
     hasUnresolvedConflict,
     hasLocalCases: Object.keys(state.cases).length > 0,
+    isReadOnly: isReadOnlyDevice(),
     trigger
   };
 }
@@ -128,6 +131,14 @@ function snapshotPayload() {
  *   would undo their decision instead of carrying it out.
  */
 async function attemptUpload(trigger = SYNC_TRIGGERS.interval, { forceUpload = false } = {}) {
+  // Checked here as well as in decideSync, and deliberately above forceUpload:
+  // this is the last line before the network call, and forceUpload exists
+  // precisely to skip the decision gate. A view-only device must have no path
+  // to uploadSnapshot() at all, not merely a decision that usually says no.
+  if (isReadOnlyDevice()) {
+    setUploadState(UPLOAD_STATES.readOnly);
+    return;
+  }
   setUploadState(UPLOAD_STATES.uploading);
   try {
     cloudSnapshotAt = await fetchSnapshotModifiedTime();
@@ -203,6 +214,7 @@ function onLocalChange() {
 }
 
 function mapDecisionState(action) {
+  if (action === SYNC_ACTIONS.readOnly) return UPLOAD_STATES.readOnly;
   if (action === SYNC_ACTIONS.wait) return UPLOAD_STATES.waiting;
   if (action === SYNC_ACTIONS.conflict) { hasUnresolvedConflict = true; return UPLOAD_STATES.conflict; }
   if (action === SYNC_ACTIONS.offline) return UPLOAD_STATES.offline;
@@ -228,6 +240,17 @@ function flushPendingChanges() {
 async function checkForConflictAtStart() {
   if (startupConflictChecked) return;
   if (!readLinkedEmail() || !hasValidToken()) return;
+  // A view-only device has no conflict to resolve: "the cloud is newer" is the
+  // normal, expected state there, and it is what the user came to read. Asking
+  // them to pick a side would only offer them a way to overwrite the cloud —
+  // the exact thing this mode exists to make impossible.
+  //
+  // Deliberately does not mark the gate as run: turning view-only off later in
+  // this session should still get its own real conflict check.
+  if (isReadOnlyDevice()) {
+    setUploadState(UPLOAD_STATES.readOnly);
+    return;
+  }
   startupConflictChecked = true;
   try {
     cloudSnapshotAt = await fetchSnapshotModifiedTime();
@@ -312,6 +335,15 @@ function startCloudBackup(onChange) {
  */
 function resolveConflict(keepLocal) {
   hasUnresolvedConflict = false;
+  if (keepLocal && isReadOnlyDevice()) {
+    // Unreachable through the UI — the conflict dialog is never opened on a
+    // view-only device — but "keep local" is the one call in this module whose
+    // whole purpose is to overwrite the cloud, so it refuses explicitly rather
+    // than relying on no caller ever making that mistake.
+    console.warn('唯讀檢視裝置不會上傳，已忽略「保留本機」的覆蓋要求');
+    setUploadState(UPLOAD_STATES.readOnly);
+    return;
+  }
   if (keepLocal) {
     scheduleAttempt(SYNC_TRIGGERS.pageHidden, { forceUpload: true });
   } else if (cloudSnapshotAt) {
@@ -326,6 +358,34 @@ function currentUploadStatus() {
     lastUploadedAt: readTimestamp(CLOUD_CONFIG.lastUploadedAtKey),
     hasUnresolvedConflict
   });
+}
+
+/**
+ * Re-decide what should happen now, after the view-only switch was flipped.
+ * Any debounce or retry timer scheduled under the old setting is cancelled
+ * first — a timer armed while the device could still upload must not fire
+ * moments after the user asked it to stop.
+ *
+ * @returns {Promise<void>} Resolves once the state has settled, including the
+ *   conflict check a device owes the cloud when it stops being view-only.
+ */
+function syncSettingsChanged() {
+  clearDebounce();
+  clearRetry();
+  retryCount = 0;
+  if (isReadOnlyDevice()) {
+    // Nothing on a view-only device can be in conflict — see
+    // checkForConflictAtStart() for why. Dropping the flag here means turning
+    // the switch on is also how a user gets out of a conflict they never
+    // wanted to be asked about on this device.
+    hasUnresolvedConflict = false;
+    setUploadState(UPLOAD_STATES.readOnly);
+    return Promise.resolve();
+  }
+  // Becoming a writing device again owes the cloud the same app-start conflict
+  // check any other launch runs before its first upload — this device may hold
+  // a stale copy, and the next keystroke would otherwise upload it.
+  return checkForConflictAtStart();
 }
 
 /**
@@ -375,5 +435,6 @@ async function describeConflict() {
 }
 
 export {
-  startCloudBackup, checkForConflictNow, resolveConflict, currentUploadStatus, describeConflict, UPLOAD_STATES
+  startCloudBackup, checkForConflictNow, resolveConflict, currentUploadStatus, describeConflict,
+  syncSettingsChanged, UPLOAD_STATES
 };

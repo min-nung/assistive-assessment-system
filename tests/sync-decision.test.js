@@ -19,6 +19,7 @@ function situation(overrides = {}) {
     msSinceLastChange: 9000,
     hasUnresolvedConflict: false,
     hasLocalCases: true,
+    isReadOnly: false,
     trigger: SYNC_TRIGGERS.interval,
     ...overrides
   };
@@ -119,6 +120,80 @@ test('存在未解決的衝突時，任何情境都不回傳 upload', () => {
   for (const input of variationsAcrossTriggers({ hasUnresolvedConflict: true })) {
     assert.notEqual(decideSync(input).action, SYNC_ACTIONS.upload);
   }
+});
+
+/* ==========================================================================
+   唯讀檢視裝置
+   ========================================================================== */
+
+test('唯讀檢視裝置回傳 read-only', () => {
+  const decision = decideSync(situation({ isReadOnly: true }));
+  assert.equal(decision.action, SYNC_ACTIONS.readOnly);
+});
+
+// 這個模組存在的理由，在唯讀裝置上就是這一條：只用來閱覽的電腦，
+// 不論本機發生什麼事，都不可以把資料推上去覆蓋另一台裝置的快照。
+test('唯讀檢視裝置在任何情境下都不回傳 upload', () => {
+  const combinations = [
+    {},
+    { hasUnresolvedConflict: true },
+    { isOnline: false },
+    { hasLocalCases: false, localChangedAt: null },
+    { localChangedAt: '不是日期', lastUploadedAt: '也不是日期' },
+    { lastUploadedAt: null, cloudSnapshotAt: null, hasLocalCases: true }
+  ];
+  for (const extra of combinations) {
+    for (const input of variationsAcrossTriggers({ ...extra, isReadOnly: true })) {
+      assert.notEqual(decideSync(input).action, SYNC_ACTIONS.upload);
+    }
+  }
+});
+
+test('唯讀檢視裝置優先於未解決的衝突', () => {
+  const decision = decideSync(situation({ isReadOnly: true, hasUnresolvedConflict: true }));
+  assert.equal(decision.action, SYNC_ACTIONS.readOnly);
+});
+
+// 唯讀裝置沒有「雲端比較新」的問題——雲端一律比較新，而且那正是要看的東西。
+test('唯讀檢視裝置在雲端較新時回傳 read-only 而非 conflict', () => {
+  const decision = decideSync(situation({
+    isReadOnly: true,
+    lastUploadedAt: '2026-07-26T09:00:00.000Z',
+    cloudSnapshotAt: '2026-07-26T11:00:00.000Z'
+  }));
+  assert.equal(decision.action, SYNC_ACTIONS.readOnly);
+});
+
+test('唯讀檢視裝置離開頁面時不補傳', () => {
+  const decision = decideSync(situation({
+    isReadOnly: true,
+    trigger: SYNC_TRIGGERS.pageHidden,
+    msSinceLastChange: 0
+  }));
+  assert.equal(decision.action, SYNC_ACTIONS.readOnly);
+});
+
+test('唯讀檢視裝置啟動時不補傳上次未上傳的變動', () => {
+  const decision = decideSync(situation({
+    isReadOnly: true,
+    trigger: SYNC_TRIGGERS.appStart,
+    localChangedAt: '2026-07-26T10:00:00.000Z',
+    lastUploadedAt: '2026-07-26T09:00:00.000Z'
+  }));
+  assert.equal(decision.action, SYNC_ACTIONS.readOnly);
+});
+
+// 尚未連結時要說的是「還沒連結」，而不是「唯讀」——唯讀裝置一樣得先連結
+// 帳號才看得到雲端資料，這時把它導向連結才是有用的訊息。
+test('尚未連結優先於唯讀檢視', () => {
+  const decision = decideSync(situation({ isReadOnly: true, isLinked: false }));
+  assert.equal(decision.action, SYNC_ACTIONS.needsAuth);
+});
+
+test('未指定唯讀時維持原本行為', () => {
+  const input = situation();
+  delete input.isReadOnly;
+  assert.equal(decideSync(input).action, SYNC_ACTIONS.upload);
 });
 
 test('雲端尚無快照且本機有個案資料時回傳 upload', () => {
@@ -340,7 +415,8 @@ test('每個決定都是已定義的動作之一', () => {
     ...variationsAcrossTriggers({ isLinked: false }),
     ...variationsAcrossTriggers({ isOnline: false }),
     ...variationsAcrossTriggers({ hasUnresolvedConflict: true }),
-    ...variationsAcrossTriggers({ hasLocalCases: false, localChangedAt: null })
+    ...variationsAcrossTriggers({ hasLocalCases: false, localChangedAt: null }),
+    ...variationsAcrossTriggers({ isReadOnly: true })
   ];
   for (const input of inputs) {
     assert.ok(actions.has(decideSync(input).action));

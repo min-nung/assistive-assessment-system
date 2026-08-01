@@ -18,7 +18,8 @@ const SYNC_ACTIONS = Object.freeze({
   wait: 'wait',
   conflict: 'conflict',
   needsAuth: 'needs-auth',
-  offline: 'offline'
+  offline: 'offline',
+  readOnly: 'read-only'
 });
 
 /** Why the question is being asked right now. */
@@ -74,6 +75,8 @@ function hasPendingChanges(changedTime, uploadedTime, hasLocalCases) {
  * @param {number} situation.msSinceLastChange Milliseconds since the last change
  * @param {boolean} situation.hasUnresolvedConflict Whether a conflict awaits the user
  * @param {boolean} situation.hasLocalCases Whether any local case data exists
+ * @param {boolean} [situation.isReadOnly] Whether this device is view-only.
+ *   Defaults to false so every existing caller keeps its current behavior.
  * @param {string} situation.trigger Why we are asking; see SYNC_TRIGGERS
  * @returns {{action: string, reason: string, retryInMs?: number}} A frozen decision
  */
@@ -87,12 +90,22 @@ function decideSync(situation = {}) {
     msSinceLastChange = 0,
     hasUnresolvedConflict = false,
     hasLocalCases = false,
+    isReadOnly = false,
     trigger = SYNC_TRIGGERS.interval
   } = situation;
 
   // Nothing else is actionable while unlinked, and no other state should mask it.
   if (!isLinked) {
     return decision(SYNC_ACTIONS.needsAuth, '尚未連結 Google 帳號，資料只保存在本機');
+  }
+
+  // A view-only device outranks every remaining state, including conflict: a
+  // conflict only exists as a question because this device might overwrite the
+  // cloud, and this one never will. Placed above everything that could reach
+  // the upload branches so "read-only means never upload" is a property of the
+  // decision itself rather than something each caller has to remember.
+  if (isReadOnly) {
+    return decision(SYNC_ACTIONS.readOnly, '此裝置為唯讀檢視，只讀取雲端資料，不會上傳覆蓋');
   }
 
   // An unresolved conflict outranks being offline so the state stays visible

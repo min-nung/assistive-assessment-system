@@ -40,11 +40,18 @@ async function previewCloudSnapshot() {
  * overwrite local data with it" without re-fetching.
  *
  * @param {object} rawPayload The payload from previewCloudSnapshot()
+ * @param {object} [options]
+ * @param {boolean} [options.safetyExport] Whether to export local data to a
+ *   JSON file first. Defaults to true, so every path that has not thought
+ *   about it keeps the insurance. A view-only device refreshing its copy of
+ *   the cloud passes false when local data holds nothing the cloud does not:
+ *   there is nothing to insure, and downloading a file on every refresh would
+ *   train the user to ignore the one export that actually mattered.
  * @returns {{ok: true, count: number}|{ok: false, message: string}} Never
  *   throws — a validation failure is reported, not raised, so a caller cannot
  *   forget to catch it and accidentally let a bad snapshot half-apply.
  */
-function applyCloudSnapshot(rawPayload) {
+function applyCloudSnapshot(rawPayload, { safetyExport = true } = {}) {
   let nextCases;
   try {
     const validated = validateBackupPayload(rawPayload);
@@ -58,7 +65,7 @@ function applyCloudSnapshot(rawPayload) {
   // The safety export happens only after validation succeeds, so a snapshot
   // that fails validation never touches local data or triggers a needless
   // export — the restore did not happen, so there is nothing to insure against.
-  exportBackup();
+  if (safetyExport) exportBackup();
 
   if (!persistCases(nextCases)) {
     return Object.freeze({ ok: false, message: '無法寫入瀏覽器儲存空間' });

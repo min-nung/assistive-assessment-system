@@ -29,6 +29,12 @@ const CLOUD_CONFIG = Object.freeze({
   lastChangedAtKey: 'stairAssessmentCloudLastChangedAt.v1',
   staleReminderKey: 'stairAssessmentCloudStaleReminderAt.v1',
 
+  /* Whether this device is a view-only device — see cloud/read-only.js. Stored
+   * per device and deliberately never travels inside a snapshot: it describes
+   * the role this browser plays, not the data. */
+  readOnlyKey: 'stairAssessmentCloudReadOnly.v1',
+  readOnlyPulledAtKey: 'stairAssessmentCloudReadOnlyPulledAt.v1',
+
   /* Matches core/state.js's BACKUP_REMINDER_DAYS: Google's own test-mode
    * token lifetime is about 7 days, so this is the same window a therapist
    * would otherwise go silently unprotected for if cloud backup quietly

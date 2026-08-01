@@ -2,8 +2,9 @@ import { loadState, runBackFn } from './core/state.js';
 import { showList } from './navigation.js';
 import { remindBackupIfNeeded } from './backup/backup.js';
 import {
-  restoreCloudLink, initCloudBackup, isCloudBackupHealthy, remindCloudBackupIfStale
+  restoreCloudLink, initCloudBackup, shouldSkipManualBackupReminder, remindCloudBackupIfStale
 } from './cloud/cloud-ui.js';
+import { applyReadOnlyFromUrl } from './cloud/read-only.js';
 import './events.js';
 
 /* Application bootstrap and service-worker integration
@@ -12,6 +13,12 @@ import './events.js';
 /* ==========================================================================
    Boot
    ========================================================================== */
+// Before anything else: a `?readonly=1` bookmark must be view-only from the
+// very first line of this session, not from whenever the user next opens
+// settings. Nothing above this point may reach an upload, and nothing below it
+// can, because every upload path re-reads the switch this line just set.
+applyReadOnlyFromUrl();
+
 loadState();
 showList();
 
@@ -30,14 +37,15 @@ initCloudBackup().catch(error => console.warn('雲端備份啟動時檢查衝突
 
 // The manual-export reminder is decided against whatever cloud state is known
 // right now, which is "not verified yet" on most launches — a therapist who
-// has not opened settings this session sees isCloudBackupHealthy() report
-// false and gets the same 7-day reminder they always would have. That is the
+// has not opened settings this session sees cloud backup report unhealthy and
+// gets the same 7-day reminder they always would have. That is the
 // conservative, honest default this project has consistently chosen over
 // guessing cloud backup is fine: better an occasional reminder cloud backup
 // would have suppressed than a suppressed reminder cloud backup was not
-// actually earning.
+// actually earning. A view-only device is the one exception that needs no
+// verification to decide: it holds no original work to remind anyone about.
 setTimeout(() => {
-  remindBackupIfNeeded(isCloudBackupHealthy());
+  remindBackupIfNeeded(shouldSkipManualBackupReminder());
   remindCloudBackupIfStale();
 }, 700);
 

@@ -35,7 +35,7 @@ import { renderVersionInfo } from './version.js';
 import {
   openCloudDialog, linkCloudAccount, unlinkCloudAccount, renderCloudPanel, ensureCloudLinkVerified,
   confirmCloudRestore, skipCloudRestore, openConflictDialog, keepLocalData, useCloudData, deferConflict,
-  renderCloudSummary
+  renderCloudSummary, setReadOnlyMode, pullCloudSnapshot
 } from './cloud/cloud-ui.js';
 
 /* DOM event bindings
@@ -133,6 +133,8 @@ document.getElementById('openCloudBtn').addEventListener('click', () => {
 document.getElementById('closeCloudDialogBtn').addEventListener('click', () => document.getElementById('cloudDialog').close());
 document.getElementById('linkCloudBtn').addEventListener('click', linkCloudAccount);
 document.getElementById('unlinkCloudBtn').addEventListener('click', unlinkCloudAccount);
+document.getElementById('readOnlyToggle').addEventListener('change', e => setReadOnlyMode(e.target.checked));
+document.getElementById('pullCloudBtn').addEventListener('click', pullCloudSnapshot);
 document.getElementById('confirmRestoreBtn').addEventListener('click', confirmCloudRestore);
 document.getElementById('skipRestoreBtn').addEventListener('click', skipCloudRestore);
 document.getElementById('cloudUploadStatus').addEventListener('click', e => {

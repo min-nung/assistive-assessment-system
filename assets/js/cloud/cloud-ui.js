@@ -1,4 +1,4 @@
-import { state } from '../core/state.js';
+import { state, onStateChanged } from '../core/state.js';
 import { CLOUD_CONFIG } from './cloud-config.js';
 import { describeLinkState, LINK_STATES } from './auth-state.js';
 import {
@@ -6,10 +6,14 @@ import {
   hasValidToken, forgetToken, DriveAuthError
 } from './drive-client.js';
 import {
-  startCloudBackup, checkForConflictNow, resolveConflict, describeConflict, currentUploadStatus, UPLOAD_STATES
+  startCloudBackup, checkForConflictNow, resolveConflict, describeConflict, currentUploadStatus,
+  syncSettingsChanged, UPLOAD_STATES
 } from './cloud-backup.js';
 import { previewCloudSnapshot, applyCloudSnapshot } from './restore.js';
 import { fetchSnapshot } from './drive-client.js';
+import {
+  isReadOnlyDevice, setReadOnlyDevice, recordPull, hasUnsavedViewEdits
+} from './read-only.js';
 import { formatBackupDate } from '../backup/backup.js';
 import { showToast } from '../ui.js';
 
@@ -91,6 +95,11 @@ function formatUploadTime(timestamp) {
  * is never allowed to render as anything but 失敗中.
  */
 function describeUploadStatus(status) {
+  // Answered before the upload state machine is consulted at all: on a
+  // view-only device this is a fact about the device, true from the moment the
+  // page loads — long before anything has had a reason to run a sync decision
+  // and leave a state behind for this function to read.
+  if (isReadOnlyDevice()) return '唯讀檢視：只讀取雲端資料，不會上傳覆蓋';
   const uploadedAt = formatUploadTime(status.lastUploadedAt);
   switch (status.state) {
     case UPLOAD_STATES.uploading:
@@ -125,8 +134,18 @@ function summarizeCloudStatus() {
   if (link.status === LINK_STATES.unlinked) {
     return { label: '雲端備份：未連結', tone: 'muted' };
   }
+  // Ranked above view-only on purpose: a view-only device still needs a valid
+  // authorization to read anything at all, so an expired one is a problem the
+  // user must act on, not something a description of this device's role may
+  // paper over.
   if (link.status === LINK_STATES.needsRelink) {
     return { label: '雲端備份：需要重新連結', tone: 'failed' };
+  }
+  // Checked before every remaining state: the upload states below describe a
+  // job this device is not doing, and claiming either protection or failure
+  // would both be wrong. What the user needs to see is which role it plays.
+  if (isReadOnlyDevice()) {
+    return { label: '雲端備份：唯讀檢視（不會上傳）', badge: '唯讀檢視', tone: 'readonly' };
   }
   if (link.status === LINK_STATES.linkedOffline) {
     return { label: '雲端備份：離線，待恢復連線後上傳', tone: 'muted' };
@@ -181,7 +200,9 @@ function renderCloudStatusBadge(summary) {
     return;
   }
   badge.style.display = '';
-  badge.textContent = summary.label.replace('雲端備份：', '');
+  // A header badge has room for a few characters, not a sentence — a summary
+  // that needs a longer explanation supplies its own short form.
+  badge.textContent = summary.badge || summary.label.replace('雲端備份：', '');
   badge.dataset.tone = summary.tone;
 }
 
@@ -193,6 +214,11 @@ function renderCloudStatusBadge(summary) {
  * to prevent. Used to decide whether the 7-day manual reminder still applies.
  */
 function isCloudBackupHealthy() {
+  // A view-only device backs nothing up, so the honest answer is no. Callers
+  // that want to know whether to nag the user should ask
+  // shouldSkipManualBackupReminder() instead — a viewer holds no original data
+  // worth reminding anyone about.
+  if (isReadOnlyDevice()) return false;
   const link = currentLinkState();
   if (link.status !== LINK_STATES.linked) return false;
   const uploadState = currentUploadStatus().state;
@@ -205,11 +231,26 @@ function isCloudBackupHealthy() {
 }
 
 /**
+ * Whether the 7-day manual-export reminder should stay quiet. Two reasons
+ * qualify: cloud backup is already doing the job, or this device is view-only
+ * and holds no original work — everything it shows came from the cloud and
+ * still lives there, so there is nothing here that a JSON export would save.
+ *
+ * @returns {boolean}
+ */
+function shouldSkipManualBackupReminder() {
+  return isReadOnlyDevice() || isCloudBackupHealthy();
+}
+
+/**
  * Days since the last successful cloud upload, or null if cloud backup was
  * never linked at all — a user who never opted in gets the plain manual
  * reminder, not a cloud-specific one about a feature they never turned on.
  */
 function daysSinceLastCloudUpload() {
+  // A view-only device never uploads by design, so "it has been a while since
+  // the last upload" is not a warning sign here — it is the whole point.
+  if (isReadOnlyDevice()) return null;
   if (!readLinkedEmail()) return null;
   const lastUploadedAt = currentUploadStatus().lastUploadedAt;
   if (!lastUploadedAt) return Infinity;
@@ -240,6 +281,99 @@ function remindCloudBackupIfStale() {
   showToast('雲端備份已超過 7 天沒有成功上傳，建議檢查連結狀態或改用手動匯出');
 }
 
+/**
+ * The view-only switch and its one action, "load the latest from the cloud".
+ *
+ * The load button appears only on a view-only device: on a normal device the
+ * same thing already happens automatically in the other direction, and putting
+ * a second overwrite-local-data button next to it would invite exactly the
+ * accident this app spends so much care avoiding.
+ *
+ * @param {string} linkStatus One of LINK_STATES
+ */
+function renderReadOnlyControls(linkStatus) {
+  const toggle = document.getElementById('readOnlyToggle');
+  const pullBtn = document.getElementById('pullCloudBtn');
+  const readOnly = isReadOnlyDevice();
+  if (toggle) toggle.checked = readOnly;
+  if (pullBtn) {
+    pullBtn.hidden = !readOnly || linkStatus === LINK_STATES.unlinked;
+    pullBtn.disabled = pullInFlight;
+    pullBtn.textContent = pullInFlight ? '載入中…' : '從雲端載入最新資料';
+  }
+}
+
+/**
+ * Turn this device into a view-only device, or back into a normal one.
+ *
+ * Both directions are confirmed, for opposite reasons. Turning it on stops
+ * this device's backups, and someone who did the day's assessments here must
+ * not discover that silently. Turning it off is the more dangerous direction:
+ * a device that has been reading a snapshot for weeks may hold a stale copy,
+ * and from that moment on it is allowed to write again.
+ *
+ * @param {boolean} on
+ */
+function setReadOnlyMode(on) {
+  const toggle = document.getElementById('readOnlyToggle');
+  const wasOn = isReadOnlyDevice();
+  if (on === wasOn) return;
+  const message = on
+    ? '要把這台裝置設為唯讀檢視嗎？\n\n這台裝置之後只會讀取雲端資料，不會再上傳，也不會覆蓋其他裝置備份的內容。'
+    : '要解除唯讀檢視嗎？\n\n這台裝置之後會恢復自動備份。若這裡的資料比雲端舊，系統會先詢問你要保留哪一份，不會自動覆蓋。';
+  if (!confirm(message)) {
+    // The checkbox already flipped itself on click; put it back.
+    if (toggle) toggle.checked = wasOn;
+    return;
+  }
+  setReadOnlyDevice(on);
+  // Not awaited: turning the switch on takes effect immediately and
+  // synchronously (see syncSettingsChanged()); only the turning-off direction
+  // has a cloud check to finish, and renderCloudPanel() runs again when it does.
+  syncSettingsChanged()
+    .then(renderCloudPanel)
+    .catch(error => console.warn('切換唯讀檢視後重新檢查雲端失敗', error));
+  renderCloudPanel();
+  showToast(on ? '已設為唯讀檢視，這台裝置不會再上傳' : '已解除唯讀檢視，這台裝置會恢復自動備份');
+}
+
+/* One pull at a time. Two overlapping fetches could resolve out of order and
+ * hand confirmCloudRestore() a snapshot the user never saw described — the
+ * same failure linkInFlight guards against on the link path. */
+let pullInFlight = false;
+
+/**
+ * Fetch the current cloud snapshot and offer to load it for viewing. This is
+ * the whole point of a view-only device: press it to see what the other device
+ * has recorded since last time.
+ *
+ * Still routed through the confirmation dialog rather than applied straight
+ * away, because it does overwrite what is on this device — the user is told
+ * the snapshot's time and case count before anything changes.
+ */
+async function pullCloudSnapshot() {
+  if (pullInFlight) return;
+  pullInFlight = true;
+  renderReadOnlyControls(currentLinkState().status);
+  try {
+    await ensureCloudLinkVerified();
+    const preview = await previewCloudSnapshot();
+    if (!preview) {
+      showToast('雲端還沒有任何快照，請先在另一台裝置備份一次');
+      return;
+    }
+    openRestoreDialog(preview, { isPull: true });
+  } catch (error) {
+    console.warn('從雲端載入快照失敗', error);
+    showToast(error instanceof DriveAuthError
+      ? '授權已失效，請重新連結 Google 帳號'
+      : '無法取得雲端資料，請確認網路後再試一次');
+  } finally {
+    pullInFlight = false;
+    renderCloudPanel();
+  }
+}
+
 function renderCloudPanel() {
   const status = document.getElementById('cloudStatus');
   const detail = document.getElementById('cloudDetail');
@@ -250,17 +384,28 @@ function renderCloudPanel() {
   if (!status || !detail || !linkBtn || !unlinkBtn) return;
 
   const state = currentLinkState();
-  status.textContent = state.label;
-  status.dataset.state = state.status;
-  detail.textContent = state.detail;
+  // auth-state.js describes what a linked device does, and what it says —
+  // "資料變動後會自動備份" — is a promise a view-only device will never keep.
+  // Overridden here rather than there so the pure module keeps describing
+  // authorization only, with no knowledge of what role the device plays.
+  const readOnlyLinked = isReadOnlyDevice() && state.status === LINK_STATES.linked;
+  status.textContent = readOnlyLinked ? '已連結（唯讀檢視）' : state.label;
+  status.dataset.state = readOnlyLinked ? 'read-only' : state.status;
+  detail.textContent = readOnlyLinked
+    ? '這台裝置只讀取雲端資料，不會自動備份，也不會覆蓋其他裝置備份的內容'
+    : state.detail;
   if (account) {
     account.textContent = state.email || '';
     account.hidden = !state.email;
   }
   if (uploadStatusEl) {
     // Only shown once linked — an unlinked or expired state already says
-    // everything that matters, and an upload line would just repeat it.
-    const showUpload = state.status === LINK_STATES.linked || state.status === LINK_STATES.linkedOffline;
+    // everything that matters, and an upload line would just repeat it. A
+    // view-only device says its piece as soon as it is linked at all: the
+    // statement does not depend on a verification that may not have run yet.
+    const showUpload = state.status === LINK_STATES.linked
+      || state.status === LINK_STATES.linkedOffline
+      || (isReadOnlyDevice() && state.status === LINK_STATES.linkedUnverified);
     const upload = showUpload ? currentUploadStatus() : null;
     const text = upload ? describeUploadStatus(upload) : null;
     uploadStatusEl.textContent = text || '';
@@ -278,6 +423,7 @@ function renderCloudPanel() {
   linkBtn.hidden = !state.canLink;
   linkBtn.textContent = state.status === LINK_STATES.needsRelink ? '重新連結' : '連結 Google 帳號';
   unlinkBtn.hidden = !state.canUnlink;
+  renderReadOnlyControls(state.status);
   // Every caller of renderCloudPanel() (link, unlink, restore, conflict
   // resolution, silent renewal) should also keep the manual-backup panel's
   // summary line current, so status updates never depend on remembering to
@@ -301,6 +447,59 @@ function openCloudDialog() {
 /* Holds the snapshot between "here is what the cloud has" and "apply it",
  * so confirming the restore dialog does not need to fetch a second time. */
 let pendingRestore = null;
+/* Whether the pending dialog is a view-only device refreshing its copy rather
+ * than a one-off restore. The two differ in what they overwrite and therefore
+ * in what is worth insuring against — see describeRestoreWarning(). */
+let pendingRestoreIsPull = false;
+
+/**
+ * Whether local data holds edits made on this view-only device that no upload
+ * will ever carry anywhere. Those are the only local changes a view-only pull
+ * can actually destroy: everything else on this device came from the cloud and
+ * is still sitting in the cloud.
+ */
+function viewEditsAtRisk() {
+  return hasUnsavedViewEdits(readTimestamp(CLOUD_CONFIG.lastChangedAtKey));
+}
+
+function describeRestoreWarning(isPull) {
+  const hasLocalCases = Object.keys(state.cases).length > 0;
+  // The safety export is only real when there is something to export — do not
+  // promise a download that applyCloudSnapshot() will skip.
+  if (!hasLocalCases) return '目前沒有本機資料會被取代。';
+  if (!isPull) {
+    return '確認還原將以雲端資料取代本機現有資料，還原前會自動匯出目前的資料作為保險。';
+  }
+  return viewEditsAtRisk()
+    ? '這台裝置是唯讀檢視，你在這裡改過的內容從未上傳，載入後會被雲端資料取代，因此會先自動匯出一份保險。'
+    : '載入後會換成雲端最新的那一份。這台裝置不會上傳，雲端與其他裝置的資料都不受影響。';
+}
+
+/**
+ * Show what the cloud has and ask before replacing local data with it. Shared
+ * by both paths that overwrite local data from a snapshot — the one-off
+ * restore after linking, and a view-only device refreshing what it displays —
+ * so neither can quietly grow a different set of warnings than the other.
+ *
+ * @param {{payload: object, caseCount: number, snapshotAt: string|null}} preview
+ * @param {object} [options]
+ * @param {boolean} [options.isPull] True for a view-only refresh
+ */
+function openRestoreDialog(preview, { isPull = false } = {}) {
+  const detail = document.getElementById('restoreDetail');
+  const warning = document.getElementById('restoreWarning');
+  const dialog = document.getElementById('restoreDialog');
+  const title = document.getElementById('restoreDialogTitle');
+  const confirmBtn = document.getElementById('confirmRestoreBtn');
+  if (!detail || !dialog?.showModal) return;
+  pendingRestore = preview.payload;
+  pendingRestoreIsPull = isPull;
+  if (title) title.textContent = isPull ? '載入雲端最新資料' : '從雲端還原';
+  if (confirmBtn) confirmBtn.textContent = isPull ? '載入' : '確認還原';
+  detail.textContent = `雲端備份時間：${formatBackupDate(preview.snapshotAt)}，共 ${preview.caseCount} 筆個案`;
+  if (warning) warning.textContent = describeRestoreWarning(isPull);
+  dialog.showModal();
+}
 
 /**
  * Offers a restore only right after an interactive link — not on every
@@ -318,42 +517,39 @@ async function offerCloudRestoreIfNew() {
     return;
   }
   if (!preview) return;
-  pendingRestore = preview.payload;
-  const detail = document.getElementById('restoreDetail');
-  const warning = document.getElementById('restoreWarning');
-  const dialog = document.getElementById('restoreDialog');
-  if (!detail || !dialog?.showModal) return;
-  detail.textContent = `雲端備份時間：${formatBackupDate(preview.snapshotAt)}，共 ${preview.caseCount} 筆個案`;
-  if (warning) {
-    // The safety export is only real when there is something to export — do
-    // not promise a download that applyCloudSnapshot() will silently skip.
-    // The "will be replaced" line only applies once local data actually
-    // exists here (a future conflict-resolution path can also open this
-    // dialog with local cases present); the empty case still needs a plain
-    // statement so the user knows this is safe either way.
-    const hasLocalCases = Object.keys(state.cases).length > 0;
-    warning.textContent = hasLocalCases
-      ? '確認還原將以雲端資料取代本機現有資料，還原前會自動匯出目前的資料作為保險。'
-      : '目前沒有本機資料會被取代。';
-  }
-  dialog.showModal();
+  // A view-only device linking for the first time is doing exactly what a pull
+  // does — this is the snapshot it exists to display — so it gets the pull's
+  // wording and bookkeeping rather than a restore's.
+  openRestoreDialog(preview, { isPull: isReadOnlyDevice() });
 }
 
 function confirmCloudRestore() {
   const payload = pendingRestore;
+  const isPull = pendingRestoreIsPull;
   pendingRestore = null;
+  pendingRestoreIsPull = false;
   document.getElementById('restoreDialog')?.close();
   if (!payload) return;
-  const result = applyCloudSnapshot(payload);
+  // A view-only refresh skips the safety export unless there is something on
+  // this device the cloud does not have. Refreshing a read-only view is meant
+  // to be a routine, repeatable action; a JSON file landing in the downloads
+  // folder every time would teach the user to ignore the exports that matter.
+  const result = applyCloudSnapshot(payload, { safetyExport: !isPull || viewEditsAtRisk() });
   if (!result.ok) {
     // A bad snapshot must not look like it went through, and must not touch
     // local data — applyCloudSnapshot() already guarantees the latter.
     alert(`無法還原雲端備份：${result.message}`);
+    return;
+  }
+  if (isPull) {
+    recordPull();
+    renderCloudPanel();
   }
 }
 
 function skipCloudRestore() {
   pendingRestore = null;
+  pendingRestoreIsPull = false;
   document.getElementById('restoreDialog')?.close();
 }
 
@@ -370,6 +566,10 @@ function describeSnapshotSide(changedAt, caseCount) {
  * again while the dialog is open just re-renders it with fresh cloud data.
  */
 async function openConflictDialog() {
+  // Unreachable on a view-only device — nothing sets the conflict state there
+  // — but this dialog's whole purpose is to offer "overwrite the cloud" as one
+  // of two buttons, so it declines to open rather than depend on that.
+  if (isReadOnlyDevice()) return;
   const dialog = document.getElementById('conflictDialog');
   const localEl = document.getElementById('conflictLocalDetail');
   const cloudEl = document.getElementById('conflictCloudDetail');
@@ -386,8 +586,16 @@ async function openConflictDialog() {
 
 /** Keep local data, overwriting the cloud snapshot on the next upload. */
 function keepLocalData() {
-  resolveConflict(true);
   document.getElementById('conflictDialog')?.close();
+  if (isReadOnlyDevice()) {
+    // Same reasoning as openConflictDialog(): this is the one button in the
+    // app whose job is to overwrite the cloud, so it says no out loud rather
+    // than trusting that it can never be reached.
+    renderCloudPanel();
+    showToast('這台裝置是唯讀檢視，不會上傳覆蓋雲端');
+    return;
+  }
+  resolveConflict(true);
   renderCloudPanel();
   showToast('已選擇保留本機資料，稍後會自動上傳覆蓋雲端');
 }
@@ -586,10 +794,28 @@ async function ensureCloudLinkVerified() {
  *   know whether cloud backup looks healthy right now rather than racing it.
  */
 function initCloudBackup() {
+  onStateChanged(warnIfEditingViewOnlyDevice);
   // renderCloudPanel() also refreshes the summary line (see its own
   // comment), so every upload-state change reaches both panels regardless
   // of which one, if either, is currently open.
   return startCloudBackup(renderCloudPanel);
+}
+
+/* Warned once per session. The point is to correct a wrong belief the first
+ * time it could form, not to argue with someone who has decided to jot
+ * something down on the viewing device anyway. */
+let viewEditWarned = false;
+
+/**
+ * A view-only device still lets the user type — the forms are the same forms,
+ * and locking them would make the app feel broken rather than safe. What must
+ * not happen is the user believing an edit made here is protected. It is not:
+ * it stays on this device and the next cloud load replaces it.
+ */
+function warnIfEditingViewOnlyDevice() {
+  if (viewEditWarned || !isReadOnlyDevice()) return;
+  viewEditWarned = true;
+  showToast('這台裝置是唯讀檢視，這項修改只會留在本機，不會上傳到雲端');
 }
 
 export {
@@ -598,5 +824,5 @@ export {
   confirmCloudRestore, skipCloudRestore,
   openConflictDialog, keepLocalData, useCloudData, deferConflict,
   summarizeCloudStatus, isCloudBackupHealthy, daysSinceLastCloudUpload, renderCloudSummary,
-  remindCloudBackupIfStale
+  remindCloudBackupIfStale, setReadOnlyMode, pullCloudSnapshot, shouldSkipManualBackupReminder
 };

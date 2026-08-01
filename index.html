@@ -196,6 +196,14 @@
     <div class="backup-panel-status" id="cloudDetail"></div>
     <div class="cloud-account" id="cloudAccount" hidden></div>
     <div class="backup-panel-status" id="cloudUploadStatus" hidden></div>
+    <label class="cloud-readonly" for="readOnlyToggle">
+      <input type="checkbox" id="readOnlyToggle">
+      <span class="cloud-readonly-text">
+        <strong>此裝置唯讀檢視</strong>
+        <small>只讀取雲端資料，永遠不上傳，不會覆蓋其他裝置備份的內容。適合只用來調閱紀錄的電腦。</small>
+      </span>
+    </label>
+    <button type="button" class="cloud-pull-btn" id="pullCloudBtn" hidden>從雲端載入最新資料</button>
     <div class="backup-actions">
       <button type="button" class="backup-export" id="linkCloudBtn">連結 Google 帳號</button>
       <button type="button" id="unlinkCloudBtn" hidden>解除連結</button>
