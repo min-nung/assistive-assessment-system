@@ -108,18 +108,14 @@ function currentLinkState() {
   });
 }
 
+// 一律報出時刻，不用「剛剛／3 分鐘前」：相對時間只說得出「多久以前」，說不出
+// 「是哪一次」。使用者要確認的是眼前這批改動有沒有被備份到，而那個判斷需要把備份
+// 時間跟自己剛才的操作時間對起來——同一支 formatBackupDate() 也負責手動備份那行，
+// 兩行並排時格式才一致。
 function formatUploadTime(timestamp) {
   if (!timestamp) return null;
-  const time = new Date(timestamp).getTime();
-  if (Number.isNaN(time)) return null;
-  const minutes = Math.round((Date.now() - time) / 60000);
-  if (minutes < 1) return '雲端：剛剛';
-  if (minutes < 60) return `雲端：${minutes} 分鐘前`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `雲端：${hours} 小時前`;
-  return `雲端：${new Date(time).toLocaleString('zh-TW', {
-    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
-  })}`;
+  if (Number.isNaN(new Date(timestamp).getTime())) return null;
+  return `雲端：${formatBackupDate(timestamp)}`;
 }
 
 /**
