@@ -1,4 +1,4 @@
-import { state, migrateCases, persistCases } from '../core/state.js';
+import { state, migrateCases, persistCases, readDeletedCases } from '../core/state.js';
 import { validateBackupPayload } from '../backup/schema.js';
 import { exportBackup } from '../backup/backup.js';
 import { fetchSnapshot } from './drive-client.js';
@@ -53,10 +53,13 @@ async function previewCloudSnapshot() {
  */
 function applyCloudSnapshot(rawPayload, { safetyExport = true } = {}) {
   let nextCases;
+  let nextDeleted;
   try {
     const validated = validateBackupPayload(rawPayload);
     nextCases = validated.cases;
     migrateCases(nextCases);
+    nextDeleted = readDeletedCases(validated.deletedCases);
+    migrateCases(nextDeleted);
   } catch (error) {
     console.warn('雲端快照驗證失敗', error);
     return Object.freeze({ ok: false, message: error.message || '格式不正確' });
@@ -67,10 +70,11 @@ function applyCloudSnapshot(rawPayload, { safetyExport = true } = {}) {
   // export — the restore did not happen, so there is nothing to insure against.
   if (safetyExport) exportBackup();
 
-  if (!persistCases(nextCases)) {
+  if (!persistCases(nextCases, nextDeleted)) {
     return Object.freeze({ ok: false, message: '無法寫入瀏覽器儲存空間' });
   }
   state.cases = nextCases;
+  state.deletedCases = nextDeleted;
   state.currentCaseId = null;
   renderList();
   const count = Object.keys(nextCases).length;

@@ -1,9 +1,9 @@
 import {
   state, defaultBasicInfo, defaultWheelchair, defaultTransfer, defaultCushion,
   defaultAirbed, defaultWalker, defaultShower, defaultHomeAccessibility,
-  defaultExemptDevices, defaultSubsidyCalc, saveState, uid
+  defaultExemptDevices, defaultSubsidyCalc, saveState, uid, TRASH_RETENTION_DAYS
 } from './state.js';
-import { showToast, showSaved } from '../ui.js';
+import { showToast, showSaved, showActionToast } from '../ui.js';
 import { renderEditor } from '../forms/stair.js';
 import { renderList } from '../views/case-list.js';
 
@@ -48,12 +48,69 @@ function createCase(name, assessmentDate) {
   return id;
 }
 
+/**
+ * Move a case to the trash. Deliberately not a real delete: the snapshot that
+ * goes to the cloud still contains the case, so a mistaken tap here — even one
+ * that has already synced to every other device — stays recoverable for
+ * TRASH_RETENTION_DAYS instead of being gone the moment the upload finishes.
+ *
+ * That property is also what lets the undo toast be a plain convenience rather
+ * than a race against the upload: nothing needs to be held back, because
+ * nothing has actually been destroyed yet.
+ */
 function deleteCase(id) {
-  if (!state.cases[id]) return;
-  if (!confirm(`確定刪除個案「${state.cases[id].name}」？此動作無法復原。`)) return;
+  const target = state.cases[id];
+  if (!target) return;
+  if (!confirm(`確定刪除個案「${target.name}」？\n\n資料會移到回收筒保留 ${TRASH_RETENTION_DAYS} 天，期間隨時可以還原。`)) return;
   delete state.cases[id];
+  state.deletedCases[id] = { ...target, deletedAt: Date.now() };
   saveState();
   renderList();
+  showActionToast(`已將「${target.name}」移到回收筒`, '復原', () => restoreDeletedCase(id));
+}
+
+/**
+ * Put a case back. Refuses when the name is taken, rather than silently
+ * creating two cases a therapist cannot tell apart — createCase() enforces the
+ * same uniqueness rule, and a restore must not be the one way around it.
+ *
+ * @returns {boolean} Whether the case was actually restored
+ */
+function restoreDeletedCase(id) {
+  const target = state.deletedCases[id];
+  if (!target) { showToast('這筆資料已經不在回收筒裡'); return false; }
+  for (const other of Object.values(state.cases)) {
+    if (other.name === target.name) {
+      showToast(`已有名稱相同的個案「${target.name}」，請先改名再還原`);
+      return false;
+    }
+  }
+  const restored = { ...target };
+  delete restored.deletedAt;
+  delete state.deletedCases[id];
+  state.cases[id] = restored;
+  saveState();
+  renderList();
+  showToast(`已還原「${restored.name}」`);
+  return true;
+}
+
+/**
+ * Delete for real, ahead of the retention deadline. This is the only path in
+ * the app that destroys case data on purpose, so it says so plainly — including
+ * that the cloud copy goes too, which is the part a user emptying a trash can
+ * would not otherwise expect.
+ *
+ * @returns {boolean} Whether the case was actually destroyed
+ */
+function purgeDeletedCase(id) {
+  const target = state.deletedCases[id];
+  if (!target) return false;
+  if (!confirm(`確定永久刪除「${target.name}」嗎？\n\n此動作無法復原，下次同步後雲端備份裡的這筆資料也會一併移除。`)) return false;
+  delete state.deletedCases[id];
+  saveState();
+  showToast(`已永久刪除「${target.name}」`);
+  return true;
 }
 
 function touchCase(id) {
@@ -238,6 +295,7 @@ function updateField(blockId, field, value, stepId) {
 }
 
 export {
-  createCase, deleteCase, touchCase, renameCurrentCase, makeStair, makePlatform,
+  createCase, deleteCase, restoreDeletedCase, purgeDeletedCase,
+  touchCase, renameCurrentCase, makeStair, makePlatform,
   addBlock, removeBlock, addStep, insertStepRow, removeStep, updateField
 };

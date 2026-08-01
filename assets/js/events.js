@@ -4,9 +4,11 @@ import {
   defaultExemptDevices, defaultSubsidyCalc, saveState, uid, runBackFn
 } from './core/state.js';
 import {
-  createCase, deleteCase, touchCase, renameCurrentCase, updateField, addBlock, addStep, removeStep,
+  createCase, deleteCase, restoreDeletedCase, purgeDeletedCase,
+  touchCase, renameCurrentCase, updateField, addBlock, addStep, removeStep,
   removeBlock, insertStepRow
 } from './core/cases.js';
+import { renderTrashList, renderTrashMenuItem, openTrashDialog } from './views/trash.js';
 import { escapeHtml } from './core/dom.js';
 import {
   moduleHasData, renderList, toggleEditingCase, clearEditingCase
@@ -100,6 +102,9 @@ document.getElementById('editCaseNameBtn').addEventListener('click', () => {
   showToast('個案名稱已更新');
 });
 document.getElementById('settingsBtn').addEventListener('click', () => {
+  // 讓「回收筒」的副標在開啟選單時就說出裡面有幾筆，使用者不必點進去才知道
+  // 剛才刪掉的那筆還救得回來。
+  renderTrashMenuItem();
   document.getElementById('settingsDialog').showModal();
   // Opening settings is a direct result of the user's own click — the safe
   // place for GIS's silent-renewal popup to fire, if the link has not been
@@ -154,6 +159,23 @@ document.getElementById('dismissRelinkBtn').addEventListener('click', dismissRel
 document.getElementById('keepLocalBtn').addEventListener('click', keepLocalData);
 document.getElementById('useCloudBtn').addEventListener('click', useCloudData);
 document.getElementById('deferConflictBtn').addEventListener('click', deferConflict);
+document.getElementById('openTrashBtn').addEventListener('click', () => {
+  document.getElementById('settingsDialog').close();
+  openTrashDialog();
+});
+document.getElementById('closeTrashDialogBtn').addEventListener('click', () => document.getElementById('trashDialog').close());
+document.getElementById('trashList').addEventListener('click', e => {
+  const restoreId = e.target.getAttribute('data-restore-case');
+  const purgeId = e.target.getAttribute('data-purge-case');
+  if (!restoreId && !purgeId) return;
+  // Re-rendered either way: a refused restore (duplicate name) leaves the list
+  // exactly as it was, and redrawing it keeps the remaining-days text current
+  // rather than frozen at whatever it said when the dialog opened.
+  if (restoreId) restoreDeletedCase(restoreId);
+  else purgeDeletedCase(purgeId);
+  renderTrashList();
+  renderTrashMenuItem();
+});
 document.getElementById('openVersionBtn').addEventListener('click', () => {
   document.getElementById('settingsDialog').close();
   renderVersionInfo();

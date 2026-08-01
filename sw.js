@@ -1,13 +1,15 @@
-const CACHE_NAME = 'assistive-assessment-modular-v17';
+const CACHE_NAME = 'assistive-assessment-modular-v18';
 const APP_SHELL = [
   './',
   './index.html',
   './assets/css/app.css',
   './assets/js/core/state.js',
   './assets/js/core/dom.js',
+  './assets/js/core/trash-retention.js',
   './assets/js/backup/schema.js',
   './assets/js/core/cases.js',
   './assets/js/views/case-list.js',
+  './assets/js/views/trash.js',
   './assets/js/forms/stair.js',
   './assets/js/forms/wheelchair.js',
   './assets/js/forms/shower.js',

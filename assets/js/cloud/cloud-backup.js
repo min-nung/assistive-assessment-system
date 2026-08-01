@@ -113,7 +113,10 @@ function snapshotPayload() {
     app: '輔具評估系統',
     version: 1,
     exportedAt: new Date().toISOString(),
-    cases: state.cases
+    cases: state.cases,
+    // 回收筒隨快照一起上傳，這正是它能救回誤刪的關鍵：刪除同步到雲端之後，
+    // 資料其實還在那份快照裡，換一台裝置也還原得回來。
+    deletedCases: state.deletedCases
   };
 }
 

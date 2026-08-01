@@ -1,6 +1,6 @@
 import {
   state, BACKUP_DATE_KEY, BACKUP_REMINDER_KEY, BACKUP_REMINDER_DAYS,
-  migrateCases, persistCases
+  migrateCases, persistCases, readDeletedCases
 } from '../core/state.js';
 import { BACKUP_SCHEMA, validateBackupPayload } from './schema.js';
 import { renderList } from '../views/case-list.js';
@@ -42,7 +42,12 @@ function exportBackup() {
   const count = Object.keys(state.cases).length;
   if (!count) { showToast('目前沒有可備份的個案資料'); return; }
   const exportedAt = new Date().toISOString();
-  const payload = { app: '輔具評估系統', version: 1, exportedAt, cases: state.cases };
+  // 回收筒一併匯出：一份備份檔的用途是把「當時的全部狀態」拿回來，而剛刪掉
+  // 卻還在保留期內的個案，正是最可能需要拿回來的那一批。
+  const payload = {
+    app: '輔具評估系統', version: 1, exportedAt,
+    cases: state.cases, deletedCases: state.deletedCases
+  };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   const date = exportedAt.slice(0, 10).replace(/-/g, '');
@@ -70,11 +75,14 @@ function importBackupFile(file) {
       const payload = validateBackupPayload(JSON.parse(reader.result));
       const nextCases = payload.cases;
       migrateCases(nextCases);
+      const nextDeleted = readDeletedCases(payload.deletedCases);
+      migrateCases(nextDeleted);
       const importedCount = Object.keys(nextCases).length;
       const currentCount = Object.keys(state.cases).length;
       if (!confirm(`確定要還原這份備份嗎？\n\n備份內有 ${importedCount} 筆個案；目前的 ${currentCount} 筆個案會被取代。`)) return;
-      if (!persistCases(nextCases)) throw new Error('無法寫入瀏覽器儲存空間');
+      if (!persistCases(nextCases, nextDeleted)) throw new Error('無法寫入瀏覽器儲存空間');
       state.cases = nextCases;
+      state.deletedCases = nextDeleted;
       state.currentCaseId = null;
       renderList();
       showToast(`已還原 ${importedCount} 筆個案資料`);

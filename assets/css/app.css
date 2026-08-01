@@ -347,6 +347,28 @@
     color: #1d4ed8; font-size: 13px; font-weight: 600;
   }
   .cloud-pull-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  /* ---------- 回收筒 ---------- */
+  .trash-dialog #trashList { margin-top: 10px; max-height: 52vh; overflow-y: auto; }
+  .trash-empty { padding: 22px 0; text-align: center; font-size: 13px; color: var(--muted); }
+  .trash-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; margin-bottom: 8px;
+    border: 1px solid var(--line); border-radius: 8px; background: #fff;
+  }
+  .trash-info { flex: 1; min-width: 0; }
+  .trash-name {
+    font-size: 14px; font-weight: 700; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .trash-meta { margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .trash-item-actions { display: flex; gap: 6px; flex: none; }
+  .trash-item-actions button {
+    padding: 6px 10px; border-radius: 7px; border: 1px solid var(--line);
+    background: #fff; font-size: 12px; font-weight: 600; color: var(--ink-soft);
+  }
+  .trash-restore { border-color: var(--brand) !important; color: var(--brand) !important; }
+  /* 永久刪除是全 App 唯一真的會銷毀個案資料的動作，顏色要說出這件事。 */
+  .trash-purge { border-color: #fecaca !important; color: #b91c1c !important; }
   .backup-actions { display: flex; gap: 8px; margin-top: 11px; }
   .backup-actions button { flex: 1; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink-soft); font-size: 13px; font-weight: 600; }
   .backup-actions .backup-export { background: var(--brand); border-color: var(--brand); color: #fff; }
@@ -802,9 +824,27 @@
     z-index: 100;
     box-shadow: var(--shadow-md);
     pointer-events: none;
-    white-space: nowrap;
+    /* 手機上的 toast 早就有訊息太長被切掉的問題（例如雲端備份逾期提醒），
+       改為在畫面內換行而不是溢出到看不見的地方。 */
+    max-width: calc(100vw - 32px);
+    text-align: center;
+    line-height: 1.5;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* 整個 toast 是 pointer-events: none，唯獨這顆按鈕要收得到點擊——
+     它是誤刪之後唯一那條「馬上救回來」的路。 */
+  .toast-action {
+    pointer-events: auto;
+    margin-left: 14px;
+    padding: 2px 4px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: underline;
+    white-space: nowrap;
+  }
 
   /* ---------- Main Menu ---------- */
   #mainMenuView .menu-intro {

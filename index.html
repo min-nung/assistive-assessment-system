@@ -164,6 +164,14 @@
         </span>
         <span class="settings-menu-arrow" aria-hidden="true">›</span>
       </button>
+      <button type="button" class="settings-menu-item" id="openTrashBtn">
+        <span class="settings-menu-icon" aria-hidden="true">🗑</span>
+        <span class="settings-menu-text">
+          <strong>回收筒</strong>
+          <small id="trashMenuLabel">已刪除的個案保留 7 天</small>
+        </span>
+        <span class="settings-menu-arrow" aria-hidden="true">›</span>
+      </button>
       <button type="button" class="settings-menu-item" id="openVersionBtn">
         <span class="settings-menu-icon" aria-hidden="true">ⓘ</span>
         <span class="settings-menu-text">
@@ -241,6 +249,14 @@
       <button type="button" class="backup-export" id="useCloudBtn">採用雲端</button>
     </div>
     <button type="button" class="backup-dialog-close" id="deferConflictBtn">先不要決定</button>
+  </div>
+</dialog>
+<dialog class="backup-dialog trash-dialog" id="trashDialog" aria-labelledby="trashDialogTitle">
+  <div class="backup-panel">
+    <div class="backup-panel-title" id="trashDialogTitle">回收筒</div>
+    <div class="backup-panel-status" id="trashNote"></div>
+    <div id="trashList"></div>
+    <button type="button" class="backup-dialog-close" id="closeTrashDialogBtn">關閉</button>
   </div>
 </dialog>
 <dialog class="backup-dialog" id="relinkDialog" aria-labelledby="relinkDialogTitle">

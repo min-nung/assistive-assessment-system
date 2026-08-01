@@ -1,4 +1,5 @@
 import { validateBackupPayload } from '../backup/schema.js';
+import { purgeExpiredDeletedCases, TRASH_RETENTION_DAYS } from './trash-retention.js';
 import { showToast } from '../ui.js';
 
 /* State, defaults, storage, and migrations
@@ -13,6 +14,10 @@ const BACKUP_REMINDER_KEY = 'stairAssessmentLastBackupReminderAt.v1';
 const BACKUP_REMINDER_DAYS = 7;
 let state = {
   cases: {},
+  /* 回收筒：已刪除但仍在保留期限內的個案，鍵同樣是個案 id，值多一個
+   * deletedAt。刻意和 cases 一起存進同一份快照，因此刪除會同步到雲端，
+   * 而「還原得回來」這件事同樣會——換一台裝置也拿得回來。 */
+  deletedCases: {},
   currentCaseId: null
 };
 let backFn = null;
@@ -300,6 +305,11 @@ function migrateCases(cases) {
   }
 }
 
+/** 從備份或儲存空間讀出的回收筒內容，一律先確認是物件再使用。 */
+function readDeletedCases(source) {
+  return source !== null && typeof source === 'object' && !Array.isArray(source) ? source : {};
+}
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -307,19 +317,36 @@ function loadState() {
     const parsed = JSON.parse(raw);
     validateBackupPayload(parsed, { allowStorageEnvelope: true });
     migrateCases(parsed.cases);
+    // 回收筒裡的個案同樣要跑 migration：它可能是好幾天前刪的，還原時得是
+    // 目前版本看得懂的格式，而不是還原之後才發現欄位對不上。
+    const deleted = readDeletedCases(parsed.deletedCases);
+    migrateCases(deleted);
+    const { kept, purged } = purgeExpiredDeletedCases(deleted, Date.now());
     state.cases = parsed.cases;
+    state.deletedCases = kept;
+    // 只有真的清掉東西時才寫回去，沒過期時不製造一次多餘的寫入與上傳。
+    if (purged > 0) persistCases(state.cases, kept);
     return true;
   } catch (error) {
     console.warn('載入失敗', error);
     state.cases = {};
+    state.deletedCases = {};
     setTimeout(() => showToast('既有資料格式異常，請由備份重新匯入'), 0);
     return false;
   }
 }
 
-function persistCases(cases) {
+/**
+ * @param {object} cases 目前的個案
+ * @param {object} [deletedCases] 回收筒內容。預設沿用目前記憶體裡的那份，
+ *   因此既有呼叫端不必知道回收筒的存在，也不會在存檔時把它清空。
+ */
+function persistCases(cases, deletedCases = state.deletedCases) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ cases }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      cases,
+      deletedCases: readDeletedCases(deletedCases)
+    }));
     return true;
   } catch (error) {
     console.error('儲存失敗', error);
@@ -348,6 +375,7 @@ function uid() {
 
 export {
   STORAGE_KEY, BACKUP_DATE_KEY, BACKUP_REMINDER_KEY, BACKUP_REMINDER_DAYS,
+  TRASH_RETENTION_DAYS, readDeletedCases,
   state, defaultBasicInfo, defaultWheelchair, defaultExemptDevices,
   defaultShower, SHOWER_ADDON_OPTIONS, showerComboKey, defaultWalker,
   defaultTransfer, defaultCushion, defaultAirbed, defaultHomeAccessibility, defaultSubsidyCalc,

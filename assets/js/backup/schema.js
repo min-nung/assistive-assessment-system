@@ -133,6 +133,25 @@ function validateBackupPayload(payload, { allowStorageEnvelope = false } = {}) {
   const entries = Object.entries(payload.cases);
   if (entries.length > BACKUP_SCHEMA.maxCases) schemaError('備份.cases', '個案數量超過上限');
   entries.forEach(([key, item], index) => validateCaseRecord(key, item, `備份.cases[${index}]`));
+
+  // 回收筒是選擇性欄位：1.7 以前的備份檔沒有它，那些檔案必須照樣匯得進來。
+  // 存在時必須通過和一般個案完全相同的檢查——回收筒裡的資料隨時可能被還原
+  // 成正式個案，不能是一份寬鬆審查過的資料。
+  if (payload.deletedCases !== undefined) {
+    if (!isPlainRecord(payload.deletedCases)) schemaError('備份.deletedCases', '必須是個案物件');
+    const deleted = Object.entries(payload.deletedCases);
+    if (deleted.length > BACKUP_SCHEMA.maxCases) schemaError('備份.deletedCases', '個案數量超過上限');
+    deleted.forEach(([key, item], index) => {
+      const path = `備份.deletedCases[${index}]`;
+      validateCaseRecord(key, item, path);
+      // 刪除時間允許缺少或無法判讀——trash-retention.js 會把那種資料留著而
+      // 不是清掉，所以它不構成拒絕整份備份的理由。但型別錯得離譜就該擋下。
+      const { deletedAt } = item;
+      if (deletedAt !== undefined && typeof deletedAt !== 'number' && typeof deletedAt !== 'string') {
+        schemaError(`${path}.deletedAt`, '刪除時間必須是數字或文字');
+      }
+    });
+  }
   return payload;
 }
 
