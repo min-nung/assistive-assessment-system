@@ -46,6 +46,10 @@ npx --yes serve . -l 5500
 
 接著開啟 `http://localhost:5500/`，不需附加檔名。
 
+### 只用來閱覽的裝置
+
+在網址後加上 `?readonly=1`（例如 `https://min-nung.github.io/assistive-assessment-system/?readonly=1`）即可將該裝置設為**唯讀檢視裝置**：只讀取雲端資料，永不上傳，因此不會覆蓋其他裝置備份的內容。設定會記在該裝置上，之後開啟不帶參數的網址仍維持唯讀；`?readonly=0` 或在「設定 → 雲端備份」中取消勾選即可解除。詳見 [ADR 0003](./docs/adr/0003-view-only-devices.md)。
+
 ## 測試
 
 ```bash
